@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DemoInventoryRepository, INVENTORY_STORAGE_KEY } from "@/features/inventory/data/demo-repository";
+import { createSeedSnapshot } from "@/features/inventory/data/seed";
 
 class MemoryStorage implements Storage {
   private readonly values = new Map<string, string>();
@@ -86,5 +87,41 @@ describe("DemoInventoryRepository", () => {
     storage.setItem(INVENTORY_STORAGE_KEY, JSON.stringify({ version: 2 }));
     expect((await new DemoInventoryRepository(storage).load()).version).toBe(1);
     expect(storage.getItem(INVENTORY_STORAGE_KEY)).toBe(JSON.stringify({ version: 2 }));
+  });
+
+  it("falls back from malformed nested version-one storage without overwriting it", async () => {
+    const storage = new MemoryStorage();
+    const malformed = {
+      ...createSeedSnapshot(),
+      documents: [{
+        id: "doc-1",
+        number: "STK-20260722-0001",
+        type: "SALE",
+        effectiveDate: "2026-07-22",
+        reference: "",
+        note: "",
+        createdAt: "2026-07-22T10:00:00.000Z",
+        lines: [{}],
+      }],
+    };
+    const serialized = JSON.stringify(malformed);
+    storage.setItem(INVENTORY_STORAGE_KEY, serialized);
+
+    expect(await new DemoInventoryRepository(storage).load()).toEqual(createSeedSnapshot());
+    expect(storage.getItem(INVENTORY_STORAGE_KEY)).toBe(serialized);
+
+    await new DemoInventoryRepository(storage).addModel("Runner");
+    expect(storage.getItem(INVENTORY_STORAGE_KEY)).not.toBe(serialized);
+  });
+
+  it.each([-1, 1.5, null])("rejects invalid persisted balance %p", async (balance) => {
+    const storage = new MemoryStorage();
+    const malformed = createSeedSnapshot();
+    malformed.balances[malformed.variants[0].id] = balance as never;
+    const serialized = JSON.stringify(malformed);
+    storage.setItem(INVENTORY_STORAGE_KEY, serialized);
+
+    expect(await new DemoInventoryRepository(storage).load()).toEqual(createSeedSnapshot());
+    expect(storage.getItem(INVENTORY_STORAGE_KEY)).toBe(serialized);
   });
 });
