@@ -151,6 +151,17 @@ describe("HistoryPage", () => {
     expect(replaceRoute).toHaveBeenCalledWith("/history", { scroll: false });
   });
 
+  it("opens a document deep link and removes only that query parameter on close", async () => {
+    const user = userEvent.setup();
+    window.history.replaceState({}, "", "/history?variant=paris-black-38.5&document=receipt");
+    renderHistory();
+
+    const dialog = await screen.findByRole("dialog", { name: "รายละเอียดเอกสาร STK-20260701-0001" });
+    expect(within(dialog).getByText("PO-100")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "ปิด" }));
+    expect(replaceRoute).toHaveBeenCalledWith("/history?variant=paris-black-38.5", { scroll: false });
+  });
+
   it("renders populated mobile history cards and uses the shared responsive page container", async () => {
     renderHistory();
     const cards = await screen.findByRole("list", { name: "ประวัติการเคลื่อนไหวแบบการ์ด" });

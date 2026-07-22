@@ -33,13 +33,18 @@ export function HistoryPageContent() {
   const pathname = usePathname();
   const router = useRouter();
   const queryVariant = searchParams.get("variant")?.trim() || null;
+  const queryDocument = searchParams.get("document")?.trim() || null;
   const [filters, setFilters] = useState<HistoryFilters>(initialFilters);
   const [variantState, setVariantState] = useState(() => ({ query: queryVariant, selected: queryVariant }));
   if (variantState.query !== queryVariant) {
     setVariantState({ query: queryVariant, selected: queryVariant });
   }
   const variantFilter = variantState.selected;
-  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
+  const [documentState, setDocumentState] = useState(() => ({ query: queryDocument, selected: queryDocument }));
+  if (documentState.query !== queryDocument) {
+    setDocumentState({ query: queryDocument, selected: queryDocument });
+  }
+  const selectedDocumentId = documentState.selected;
   const rows = useMemo(() => snapshot
     ? selectHistory(snapshot, { ...filters, variantId: variantFilter ?? undefined })
     : [], [filters, snapshot, variantFilter]);
@@ -51,6 +56,18 @@ export function HistoryPageContent() {
     const query = next.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
     setVariantState({ query: queryVariant, selected: null });
+  }
+
+  function openSelectedDocument(documentId: string) {
+    setDocumentState({ query: queryDocument, selected: documentId });
+  }
+
+  function closeSelectedDocument() {
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("document");
+    const query = next.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    setDocumentState({ query: queryDocument, selected: null });
   }
 
   if (loading && !snapshot) return <div className="page-state">กำลังโหลดประวัติการเคลื่อนไหว…</div>;
@@ -116,7 +133,7 @@ export function HistoryPageContent() {
                     <td>{row.reference || "—"}</td>
                     <td>{row.lineCount}</td>
                     <td><strong className={row.pairMovement < 0 ? "quantity-alert" : ""}>{signedPairs(row.pairMovement)}</strong></td>
-                    <td><button className="icon-button" type="button" aria-label={`ดูรายละเอียด ${row.number}`} onClick={() => setSelectedDocumentId(row.documentId)}><Eye aria-hidden size={19} /></button></td>
+                    <td><button className="icon-button" type="button" aria-label={`ดูรายละเอียด ${row.number}`} onClick={() => openSelectedDocument(row.documentId)}><Eye aria-hidden size={19} /></button></td>
                   </tr>
                 ))}
               </tbody>
@@ -137,7 +154,7 @@ export function HistoryPageContent() {
                 <Button
                   variant="ghost"
                   aria-label={`ดูรายละเอียด ${row.number} แบบการ์ด`}
-                  onClick={() => setSelectedDocumentId(row.documentId)}
+                  onClick={() => openSelectedDocument(row.documentId)}
                 ><Eye aria-hidden size={18} />ดูรายละเอียด</Button>
               </article>
             ))}
@@ -151,7 +168,7 @@ export function HistoryPageContent() {
         open={!!selectedDocument}
         title={selectedDocument ? `รายละเอียดเอกสาร ${selectedDocument.number}` : "รายละเอียดเอกสาร"}
         description="เอกสารที่บันทึกแล้วไม่สามารถแก้ไขหรือลบได้"
-        onClose={() => setSelectedDocumentId(null)}
+        onClose={closeSelectedDocument}
       >
         {selectedDocument && (
           <div className="modal__body document-detail">
@@ -174,7 +191,7 @@ export function HistoryPageContent() {
                 );
               })}
             </ul>
-            <footer className="modal__footer"><Button variant="secondary" onClick={() => setSelectedDocumentId(null)}>ปิด</Button></footer>
+            <footer className="modal__footer"><Button variant="secondary" onClick={closeSelectedDocument}>ปิด</Button></footer>
           </div>
         )}
       </Modal>
