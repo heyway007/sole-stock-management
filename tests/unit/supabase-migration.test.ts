@@ -46,4 +46,22 @@ describe("Supabase inventory migration ACL", () => {
     expect(upgradeMigration).toContain("revoke all on function public.ensure_product_variant(uuid, uuid, numeric) from public, anon, authenticated;");
     expect(upgradeMigration).toContain("grant execute on function public.ensure_product_variant(uuid, uuid, numeric) to anon, authenticated;");
   });
+
+  it("ships an atomic audited clear-stock RPC with narrow execution grants", () => {
+    const clearMigration = readFileSync(
+      resolve(process.cwd(), "supabase/migrations/202607220003_clear_inventory_stock.sql"),
+      "utf8",
+    ).replaceAll("\r\n", "\n").toLocaleLowerCase("en-US");
+
+    expect(clearMigration).toContain("create or replace function public.clear_inventory_stock(command jsonb)");
+    expect(clearMigration).toMatch(/from public\.inventory_balances balance[\s\S]*?order by balance\.variant_id[\s\S]*?for update/);
+    expect(clearMigration).toContain("where balance.quantity > 0");
+    expect(clearMigration).toContain("pg_catalog.pg_advisory_xact_lock");
+    expect(clearMigration).toContain("where document.client_request_id = request_id");
+    expect(clearMigration).toContain("'clear-stock'");
+    expect(clearMigration).toContain("return public.post_stock_document(clear_command);");
+    expect(clearMigration).toContain("revoke all on function public.clear_inventory_stock(jsonb) from public, anon, authenticated;");
+    expect(clearMigration).toContain("grant execute on function public.clear_inventory_stock(jsonb) to anon, authenticated;");
+    expect(clearMigration).not.toMatch(/grant\s+(?:insert|update|delete)\s+on\s+public\./);
+  });
 });
