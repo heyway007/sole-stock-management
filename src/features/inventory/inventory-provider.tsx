@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type PropsWithChildren } from "react";
-import { createInventoryRepository, type InventoryRepositorySelection, type RepositoryFactoryOptions } from "./data/repository-factory";
+import { selectInventoryRepository, type InventoryRepositorySelection, type RepositoryFactoryOptions } from "./data/repository-factory";
 import type { InventoryRepository } from "./data/inventory-repository";
 import type { InventorySnapshot, StockDocument, StockDocumentInput } from "./domain/types";
 
@@ -20,13 +20,17 @@ interface InventoryContextValue {
 
 interface InventoryProviderProps extends PropsWithChildren {
   factoryOptions?: RepositoryFactoryOptions;
+  repository?: InventoryRepository;
 }
 
 const InventoryContext = createContext<InventoryContextValue | null>(null);
 const LOAD_ERROR = "ไม่สามารถโหลดข้อมูลสต็อกได้ กรุณาลองใหม่อีกครั้ง";
 const SAVE_ERROR = "ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้ง";
 
-export function InventoryProvider({ children, factoryOptions }: InventoryProviderProps) {
+export function InventoryProvider({ children, factoryOptions, repository }: InventoryProviderProps) {
+  if (repository && process.env.NODE_ENV !== "test") {
+    throw new Error("The InventoryProvider repository prop is test-only; configure Supabase through the repository factory.");
+  }
   const selectionRef = useRef<InventoryRepositorySelection | null>(null);
   const [snapshot, setSnapshot] = useState<InventorySnapshot | null>(null);
   const [loading, setLoading] = useState(true);
@@ -34,9 +38,13 @@ export function InventoryProvider({ children, factoryOptions }: InventoryProvide
   const [error, setError] = useState<string | null>(null);
 
   const getSelection = useCallback(() => {
-    if (!selectionRef.current) selectionRef.current = createInventoryRepository(factoryOptions);
+    if (!selectionRef.current) {
+      selectionRef.current = repository
+        ? { repository, mode: "demo" }
+        : selectInventoryRepository(factoryOptions);
+    }
     return selectionRef.current;
-  }, [factoryOptions]);
+  }, [factoryOptions, repository]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -59,7 +67,7 @@ export function InventoryProvider({ children, factoryOptions }: InventoryProvide
       if (!cancelled) void refresh();
     });
     return () => { cancelled = true; };
-  }, [factoryOptions, refresh]);
+  }, [factoryOptions, refresh, repository]);
 
   const runMutation = useCallback(async <T,>(mutation: (repository: InventoryRepository) => Promise<T>): Promise<T> => {
     try {

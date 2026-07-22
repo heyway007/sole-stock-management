@@ -57,20 +57,14 @@ function InventoryState() {
 describe("InventoryProvider", () => {
   afterEach(cleanup);
 
-  it("shows loading until the injected repository resolves", async () => {
+  it("accepts a direct in-memory repository only in tests and labels it demo", async () => {
     const repository = new DelayedDemoRepository(new MemoryStorage());
-    render(<InventoryProvider factoryOptions={{
-      environment: {
-        NEXT_PUBLIC_INVENTORY_BACKEND: "supabase",
-        NEXT_PUBLIC_SUPABASE_URL: "https://inventory.example.supabase.co",
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: "public-key",
-      },
-      createSupabaseRepository: () => repository,
-    }}><InventoryState /></InventoryProvider>);
+    render(<InventoryProvider repository={repository}><InventoryState /></InventoryProvider>);
 
     expect(screen.getByText("กำลังโหลด")).toBeInTheDocument();
     repository.release();
     expect(await screen.findByText("พร้อมใช้งาน")).toBeInTheDocument();
+    expect(screen.getByText("โหมด: demo")).toBeInTheDocument();
   });
 
   it("refreshes the snapshot after a successful document post", async () => {
@@ -132,5 +126,17 @@ describe("InventoryProvider", () => {
     }}><InventoryState /></InventoryProvider>);
 
     expect(await screen.findByText("โหมด: demo")).toBeInTheDocument();
+  });
+
+  it("refuses direct repository injection outside the test environment", () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    Object.defineProperty(process.env, "NODE_ENV", { value: "production", configurable: true, writable: true, enumerable: true });
+
+    try {
+      expect(() => render(<InventoryProvider repository={new DemoInventoryRepository(new MemoryStorage())}><InventoryState /></InventoryProvider>))
+        .toThrow(/test-only/);
+    } finally {
+      Object.defineProperty(process.env, "NODE_ENV", { value: originalNodeEnv, configurable: true, writable: true, enumerable: true });
+    }
   });
 });

@@ -27,7 +27,7 @@ export function isSupabaseInventoryConfigured(options: RepositoryFactoryOptions 
     && Boolean(environment.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 }
 
-export function createInventoryRepository(options: RepositoryFactoryOptions = {}): InventoryRepositorySelection {
+export function selectInventoryRepository(options: RepositoryFactoryOptions = {}): InventoryRepositorySelection {
   if (isSupabaseInventoryConfigured(options)) {
     if (options.createSupabaseRepository) {
       return { repository: options.createSupabaseRepository(), mode: "supabase" };
@@ -37,4 +37,8 @@ export function createInventoryRepository(options: RepositoryFactoryOptions = {}
   const storage = options.storage ?? (typeof window === "undefined" ? undefined : window.localStorage);
   if (!storage) throw new Error("ไม่สามารถเปิดพื้นที่จัดเก็บข้อมูลในเบราว์เซอร์ได้");
   return { repository: new DemoInventoryRepository(storage), mode: "demo" };
+}
+
+export function createInventoryRepository(options: RepositoryFactoryOptions = {}): InventoryRepository {
+  return selectInventoryRepository(options).repository;
 }
