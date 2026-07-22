@@ -1,6 +1,6 @@
 import { defineConfig } from "playwright/test";
 
-const baseURL = "http://localhost:3000";
+const baseURL = "http://localhost:3100";
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -26,11 +26,20 @@ export default defineConfig({
         isMobile: true,
       },
     },
+    {
+      name: "mobile-min",
+      use: {
+        browserName: "chromium",
+        viewport: { width: 360, height: 800 },
+        hasTouch: true,
+        isMobile: true,
+      },
+    },
   ],
   webServer: {
-    command: "npm run dev",
+    command: "npm run dev -- --port 3100",
     url: baseURL,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     env: {
       NEXT_PUBLIC_INVENTORY_BACKEND: "demo",
     },

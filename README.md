@@ -70,7 +70,7 @@ npm run build
 npm run e2e
 ```
 
-`npm run e2e` starts and stops its own demo-mode development server through Playwright and runs Chromium at 1440×900 and 390×844. Run only the inventory smoke spec with:
+`npm run e2e` always starts and stops its own demo-mode development server on dedicated port `3100` through Playwright, with existing-server reuse disabled so an occupied port fails safely. It runs Chromium at 1440×900, 390×844, and the minimum supported 360×800 viewport. Run only the inventory smoke spec with:
 
 ```powershell
 npm run e2e -- tests/e2e/inventory.spec.ts

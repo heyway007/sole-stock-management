@@ -2,6 +2,8 @@ import { expect, test, type Locator, type Page } from "playwright/test";
 
 const desktopProject = "desktop";
 const mobileProject = "mobile";
+const mobileMinProject = "mobile-min";
+const mobileProjects = new Set([mobileProject, mobileMinProject]);
 
 async function resetDemoStorage(page: Page) {
   await page.goto("/");
@@ -22,21 +24,62 @@ async function chooseVariant(
 }
 
 async function expectNoDocumentOverflow(page: Page) {
+  const viewport = page.viewportSize();
+  expect(viewport, "project should configure an explicit viewport").not.toBeNull();
   await expect.poll(() => page.evaluate(() => ({
     clientWidth: document.documentElement.clientWidth,
     scrollWidth: document.documentElement.scrollWidth,
-  }))).toEqual({ clientWidth: 390, scrollWidth: 390 });
+  }))).toEqual({ clientWidth: viewport!.width, scrollWidth: viewport!.width });
 }
 
-async function expectTouchTarget(locator: Locator) {
+async function expectTouchTarget(page: Page, locator: Locator) {
   await expect(locator).toBeVisible();
   const box = await locator.boundingBox();
+  const viewport = page.viewportSize();
   expect(box, "primary control should have a rendered box").not.toBeNull();
+  expect(viewport, "project should configure an explicit viewport").not.toBeNull();
+  expect(box!.width, "primary control should be at least 44 px wide").toBeGreaterThanOrEqual(44);
   expect(box!.height, "primary control should be at least 44 px high").toBeGreaterThanOrEqual(44);
+  expect(box!.x, "primary control should stay inside the left viewport edge").toBeGreaterThanOrEqual(0);
+  expect(box!.x + box!.width, "primary control should stay inside the right viewport edge").toBeLessThanOrEqual(viewport!.width);
+}
+
+async function expectMobileNavClearance(page: Page) {
+  const viewport = page.viewportSize();
+  const main = page.getByRole("main");
+  const mobileNavigation = page.getByRole("navigation", { name: "เมนูมือถือ" });
+  const navigationBox = await mobileNavigation.boundingBox();
+  const mainPaddingBottom = await main.evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingBottom));
+  const lastTargetPosition = await main.locator("a,button,input,select,textarea").evaluateAll(async (elements) => {
+    const visible = elements.filter((element) => {
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+    });
+    const lastTarget = visible.at(-1);
+    if (!lastTarget) return null;
+    lastTarget.scrollIntoView({ block: "center" });
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    const targetBox = lastTarget.getBoundingClientRect();
+    const navBox = document.querySelector(".mobile-nav")!.getBoundingClientRect();
+    return { top: targetBox.top, bottom: targetBox.bottom, navTop: navBox.top };
+  });
+
+  expect(viewport, "mobile project should configure a viewport").not.toBeNull();
+  expect(navigationBox, "mobile navigation should have a rendered box").not.toBeNull();
+  expect(Math.round(navigationBox!.y + navigationBox!.height)).toBe(viewport!.height);
+  expect(mainPaddingBottom).toBeGreaterThanOrEqual(navigationBox!.height);
+  expect(lastTargetPosition, "main content should expose a visible interactive target").not.toBeNull();
+  expect(lastTargetPosition!.top).toBeGreaterThanOrEqual(0);
+  expect(lastTargetPosition!.bottom).toBeLessThanOrEqual(lastTargetPosition!.navTop);
 }
 
 test("demo inventory workflow stays accurate on desktop and routes stay usable on mobile", async ({ page }, testInfo) => {
-  expect([desktopProject, mobileProject]).toContain(testInfo.project.name);
+  expect(testInfo.config.projects.map((project) => project.name).sort()).toEqual(
+    [desktopProject, mobileProject, mobileMinProject].sort(),
+  );
+  expect(testInfo.project.use.baseURL).toBe("http://localhost:3100");
+  expect([desktopProject, ...mobileProjects]).toContain(testInfo.project.name);
   await resetDemoStorage(page);
 
   if (testInfo.project.name === desktopProject) {
@@ -126,14 +169,15 @@ test("demo inventory workflow stays accurate on desktop and routes stay usable o
   for (const check of navigationChecks) {
     const link = mobileNavigation.getByRole("link", { name: check.name, exact: true });
     await link.scrollIntoViewIfNeeded();
-    await expectTouchTarget(link);
-    await link.click();
+    await expectTouchTarget(page, link);
+    if (check.name === "ภาพรวม") {
+      await expect(link).toHaveAttribute("aria-current", "page");
+    } else {
+      await link.click();
+    }
     await expect(page.getByRole("heading", { level: 1, name: check.heading })).toBeVisible();
-    await expectTouchTarget(check.primary);
+    await expectTouchTarget(page, check.primary);
     await expectNoDocumentOverflow(page);
+    await expectMobileNavClearance(page);
   }
-
-  const navigationBox = await mobileNavigation.boundingBox();
-  expect(navigationBox).not.toBeNull();
-  expect(Math.round(navigationBox!.y + navigationBox!.height)).toBe(844);
 });
