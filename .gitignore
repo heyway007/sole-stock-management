@@ -1,4 +1,8 @@
 .superpowers/
+.env
+.env.local
+.env.*.local
+!.env.example
 node_modules/
 .next/
 tsconfig.tsbuildinfo
