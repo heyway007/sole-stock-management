@@ -524,3 +524,60 @@ button, input, select { font: inherit; }
   .production-detail-table-wrap { display: block; }
   .production-detail-line-cards { display: none; }
 }
+
+/* A4 production order print preview */
+.production-print-preview { min-height: 100%; background: #e8ebe8; padding: 18px; }
+.print-controls { width: min(100%, 794px); display: flex; justify-content: space-between; gap: 10px; margin: 0 auto 16px; }
+.production-print-page { width: min(100%, 794px); min-height: 1123px; margin: 0 auto; color: #17211c; background: #fff; padding: clamp(24px, 5vw, 48px); box-shadow: 0 18px 55px rgb(8 23 18 / 18%); }
+.production-print-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; border-bottom: 3px solid var(--forest-800); padding-bottom: 18px; }
+.production-print-brand, .production-print-title { display: grid; gap: 3px; }
+.production-print-brand strong { font-size: 1.05rem; letter-spacing: 0.12em; }
+.production-print-brand span { color: #5d6962; font-size: 0.75rem; }
+.production-print-title { text-align: right; }
+.production-print-title h1 { margin: 0; font-size: clamp(1.5rem, 4vw, 2rem); }
+.production-print-title > strong { color: var(--green-600); }
+.production-print-metadata { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 20px 0; }
+.production-print-metadata > div { display: grid; gap: 2px; border: 1px solid #d9ded9; padding: 10px 12px; }
+.production-print-metadata span { color: #5d6962; font-size: 0.72rem; }
+.production-print-table { width: 100%; border-collapse: collapse; }
+.production-print-table th, .production-print-table td { border: 1px solid #aeb7b1; padding: 9px 10px; text-align: left; }
+.production-print-table th { color: #fff; background: var(--forest-800); font-size: 0.78rem; }
+.production-print-table th:first-child, .production-print-table td:first-child { width: 42px; text-align: center; }
+.production-print-table th:nth-last-child(-n+2), .production-print-table td:nth-last-child(-n+2) { text-align: right; }
+.production-print-table tfoot { font-weight: 800; }
+.production-print-table tfoot td:first-child { text-align: right; }
+.production-print-note { min-height: 84px; margin-top: 18px; border: 1px solid #aeb7b1; padding: 12px; }
+.production-print-note p { margin: 5px 0 0; white-space: pre-wrap; }
+.production-print-total { margin: 12px 0 0; text-align: right; font-size: 1rem; font-weight: 800; }
+.production-print-signatures { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 60px; margin-top: 88px; }
+.production-print-signatures > div { display: grid; justify-items: center; gap: 6px; text-align: center; }
+.signature-line { width: min(100%, 220px); border-top: 1px solid #17211c; }
+.production-print-signatures small { color: #5d6962; }
+
+@page { size: A4 portrait; margin: 12mm; }
+
+@media print {
+  html, body { color: #000; background: #fff !important; }
+  .sidebar, .mobile-nav, .print-hidden { display: none !important; }
+  .app-shell { display: block; min-height: auto; }
+  .app-main { overflow: visible; padding: 0; }
+  .production-print-preview { min-height: auto; background: #fff; padding: 0; }
+  .production-print-page { width: auto; min-height: auto; max-width: none; margin: 0; color: #000; background: #fff; padding: 0; box-shadow: none; }
+  .production-print-header { border-color: #000; }
+  .production-print-title > strong { color: #000; }
+  .production-print-table thead { display: table-header-group; }
+  .production-print-table th { color: #000; background: #fff; }
+  .production-print-table tr, .production-print-signatures { break-inside: avoid; }
+}
+
+@media (max-width: 599px) {
+  .production-print-preview { padding: 10px; }
+  .print-controls { flex-direction: column; }
+  .print-controls .button { width: 100%; }
+  .production-print-page { min-height: auto; padding: 22px 16px; }
+  .production-print-header { flex-direction: column; }
+  .production-print-title { text-align: left; }
+  .production-print-metadata { grid-template-columns: 1fr; }
+  .production-print-table th, .production-print-table td { padding: 7px 5px; font-size: 0.75rem; }
+  .production-print-signatures { gap: 24px; margin-top: 64px; }
+}
