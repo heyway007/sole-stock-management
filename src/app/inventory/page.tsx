@@ -37,6 +37,7 @@ export function InventoryPageContent() {
   const [toast, setToast] = useState<string | null>(null);
 
   const rows = useMemo(() => snapshot ? filterInventory(snapshot, filters) : [], [filters, snapshot]);
+  const totalPairs = useMemo(() => rows.reduce((total, row) => total + row.quantity, 0), [rows]);
   const models = snapshot?.models.filter((model) => model.active) ?? [];
   const colors = snapshot?.colors.filter((color) => color.active) ?? [];
 
@@ -85,7 +86,10 @@ export function InventoryPageContent() {
           <h1>สินค้าคงคลัง</h1>
           <p>ตรวจสอบจำนวนคงเหลือและตั้งค่าเกณฑ์แจ้งเตือนแต่ละไซซ์</p>
         </div>
-        <span className="inventory-count"><strong>{rows.length}</strong><small>รายการ</small></span>
+        <div className="inventory-summary" role="group" aria-label="สรุปสินค้าคงคลัง">
+          <span className="inventory-count"><strong>{rows.length}</strong><small>รายการ</small></span>
+          <span className="inventory-count"><strong>{totalPairs}</strong><small>คู่</small></span>
+        </div>
       </header>
 
       <RepositoryStatusBanner />

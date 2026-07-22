@@ -233,7 +233,8 @@ button, input, select { font: inherit; }
 .form-field input::placeholder { color: #9aa09c; }
 .form-field__error { color: #a63d31; font-size: 0.78rem; }
 
-.inventory-header { align-items: center; }
+.inventory-header { align-items: center; flex-wrap: wrap; }
+.inventory-summary { display: flex; flex-shrink: 0; gap: 10px; margin-left: auto; }
 .inventory-count { min-width: 72px; display: flex; flex-direction: column; align-items: center; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); padding: 10px 14px; box-shadow: var(--shadow); }
 .inventory-count strong { font-size: 1.35rem; line-height: 1.1; }
 .inventory-count small { color: var(--muted); }
@@ -279,6 +280,11 @@ button, input, select { font: inherit; }
 .toast--error > svg { color: #ffd0c8; }
 .toast button { width: 44px; min-width: 44px; height: 44px; min-height: 44px; display: grid; place-items: center; border: 0; border-radius: 10px; color: #fff; background: transparent; cursor: pointer; }
 .toast button:hover { background: rgb(255 255 255 / 10%); }
+
+@media (max-width: 559px) {
+  .inventory-header > div:first-child { min-width: 0; flex: 1 1 100%; }
+  .inventory-summary { width: 100%; justify-content: flex-end; }
+}
 
 @media (min-width: 560px) {
   .filter-panel { grid-template-columns: repeat(2, minmax(0, 1fr)); }

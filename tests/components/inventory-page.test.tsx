@@ -51,6 +51,25 @@ describe("InventoryPage", () => {
     expect(within(mobileCards).getAllByText("ไซซ์ 38").length).toBeGreaterThan(0);
   });
 
+  it("summarizes matching variants and pairs as filters change", async () => {
+    const user = userEvent.setup();
+    renderInventory();
+
+    const summary = await screen.findByRole("group", { name: "สรุปสินค้าคงคลัง" });
+    expect(within(summary).getByText("63")).toBeInTheDocument();
+    expect(within(summary).getByText("773")).toBeInTheDocument();
+    expect(within(summary).getByText("รายการ")).toBeInTheDocument();
+    expect(within(summary).getByText("คู่")).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "รุ่นสินค้า" }), "castor");
+    await user.selectOptions(screen.getByRole("combobox", { name: "สีสินค้า" }), "brown");
+    expect(within(summary).getByText("7")).toBeInTheDocument();
+    expect(within(summary).getByText("83")).toBeInTheDocument();
+
+    await user.type(screen.getByRole("searchbox", { name: "ค้นหาสินค้า" }), "ไม่มีสินค้านี้");
+    expect(within(summary).getAllByText("0")).toHaveLength(2);
+  });
+
   it("searches decimal sizes and filters the same rows to low stock", async () => {
     const user = userEvent.setup();
     renderInventory();
