@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Kanit } from "next/font/google";
 import { AppShell } from "@/components/app-shell";
 import { InventoryProvider } from "@/features/inventory/inventory-provider";
+import "sweetalert2/dist/sweetalert2.min.css";
 import "./globals.css";
 
 const kanit = Kanit({
