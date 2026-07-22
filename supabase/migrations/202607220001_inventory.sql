@@ -616,6 +616,14 @@ grant usage on schema public to anon, authenticated;
 grant select on public.shoe_models, public.colors, public.product_variants,
   public.inventory_balances, public.stock_documents, public.stock_document_lines
   to anon, authenticated;
+
+-- Clear any table-wide privileges inherited from project defaults before the
+-- exact browser-edit columns are granted below.
+revoke insert, update, delete on public.shoe_models,
+  public.colors, public.product_variants from public, anon, authenticated;
+revoke truncate, references, trigger on public.shoe_models,
+  public.colors, public.product_variants from public, anon, authenticated;
+
 grant insert (name), update (name, active) on public.shoe_models to anon, authenticated;
 grant insert (name), update (name, active) on public.colors to anon, authenticated;
 grant update (low_stock_threshold) on public.product_variants to anon, authenticated;
