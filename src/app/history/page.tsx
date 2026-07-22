@@ -44,7 +44,7 @@ export function HistoryPageContent() {
   return (
     <div className="page history-page">
       <header className="page-header">
-        <div><p className="eyebrow">Movement ledger</p><h1>ประวัติการเคลื่อนไหว</h1><p>ตรวจสอบเอกสารและความเปลี่ยนแปลงของสต็อกย้อนหลัง</p></div>
+        <div><p className="eyebrow">บัญชีการเคลื่อนไหว</p><h1>ประวัติการเคลื่อนไหว</h1><p>ตรวจสอบเอกสารและความเปลี่ยนแปลงของสต็อกย้อนหลัง</p></div>
       </header>
 
       <section className="filter-bar history-filters" aria-label="ตัวกรองประวัติ">

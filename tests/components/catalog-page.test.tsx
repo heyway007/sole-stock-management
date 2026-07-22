@@ -21,6 +21,23 @@ function renderCatalog() {
   return repository;
 }
 
+class FailingActivationRepository extends DemoInventoryRepository {
+  failNextActivation = true;
+
+  override async setModelActive(id: string, active: boolean): Promise<void> {
+    if (this.failNextActivation) {
+      this.failNextActivation = false;
+      throw new Error("network failed");
+    }
+    return super.setModelActive(id, active);
+  }
+}
+
+function renderCatalogWith(repository: DemoInventoryRepository) {
+  render(<InventoryProvider repository={repository}><CatalogPageContent /></InventoryProvider>);
+  return repository;
+}
+
 describe("CatalogPage", () => {
   afterEach(cleanup);
 
@@ -28,6 +45,9 @@ describe("CatalogPage", () => {
     renderCatalog();
     const models = await screen.findByRole("region", { name: "จัดการรุ่นรองเท้า" });
     const colors = screen.getByRole("region", { name: "จัดการสี" });
+
+    expect(screen.getByText("แค็ตตาล็อกสินค้า")).toBeInTheDocument();
+    expect(screen.queryByText("Product catalog")).not.toBeInTheDocument();
 
     for (const model of ["Paris", "Castor", "Weave"]) expect(within(models).getByText(model)).toBeInTheDocument();
     for (const color of ["Black", "Navy", "Olive", "Brown", "Sand"]) expect(within(colors).getByText(color)).toBeInTheDocument();
@@ -68,7 +88,7 @@ describe("CatalogPage", () => {
     const addInput = screen.getByRole("textbox", { name: "ชื่อรุ่นใหม่" });
     await user.type(addInput, "  PARIS  ");
     await user.click(screen.getByRole("button", { name: "เพิ่มรุ่น" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("มีชื่อรุ่นนี้ซ้ำอยู่แล้ว");
+    expect(await screen.findByRole("alert", { name: "เกิดข้อผิดพลาด" })).toHaveTextContent("มีชื่อรุ่นนี้ซ้ำอยู่แล้ว");
     expect((await repository.load()).models.filter((model) => model.name.toLocaleLowerCase("en-US") === "paris")).toHaveLength(1);
   });
 
@@ -87,7 +107,7 @@ describe("CatalogPage", () => {
 
     await user.type(screen.getByRole("textbox", { name: "ชื่อสีใหม่" }), "black");
     await user.click(screen.getByRole("button", { name: "เพิ่มสี" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("มีชื่อสีนี้ซ้ำอยู่แล้ว");
+    expect(await screen.findByRole("alert", { name: "เกิดข้อผิดพลาด" })).toHaveTextContent("มีชื่อสีนี้ซ้ำอยู่แล้ว");
   });
 
   it("confirms deactivation, retains referenced variants, and offers reactivation", async () => {
@@ -110,5 +130,24 @@ describe("CatalogPage", () => {
     expect(await screen.findByRole("button", { name: "ปิดใช้งานรุ่น Paris" })).toBeInTheDocument();
     after = await repository.load();
     expect(after.models.find((model) => model.id === "paris")?.active).toBe(true);
+  });
+
+  it("announces a failed deactivation as an error, keeps the confirmation open, and allows retry", async () => {
+    const user = userEvent.setup();
+    const repository = renderCatalogWith(new FailingActivationRepository(new MemoryStorage()));
+    await screen.findByText("Paris");
+
+    await user.click(screen.getByRole("button", { name: "ปิดใช้งานรุ่น Paris" }));
+    let dialog = screen.getByRole("dialog", { name: "ยืนยันปิดใช้งานรุ่น Paris" });
+    await user.click(within(dialog).getByRole("button", { name: "ยืนยันปิดใช้งาน" }));
+
+    expect(await screen.findByRole("alert", { name: "เกิดข้อผิดพลาด" })).toHaveTextContent("ไม่สามารถบันทึกข้อมูลได้");
+    dialog = screen.getByRole("dialog", { name: "ยืนยันปิดใช้งานรุ่น Paris" });
+    expect(within(dialog).getByText("ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้ง")).toBeInTheDocument();
+    expect((await repository.load()).models.find((model) => model.id === "paris")?.active).toBe(true);
+
+    await user.click(within(dialog).getByRole("button", { name: "ยืนยันปิดใช้งาน" }));
+    expect(await screen.findByRole("button", { name: "เปิดใช้งานรุ่น Paris" })).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "บันทึกสำเร็จ" })).toHaveTextContent("ปิดใช้งานรุ่น Paris แล้ว");
   });
 });

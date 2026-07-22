@@ -75,6 +75,9 @@ describe("HistoryPage", () => {
     renderHistory();
     const table = await screen.findByRole("table", { name: "ประวัติการเคลื่อนไหวสต็อก" });
 
+    expect(screen.getByText("บัญชีการเคลื่อนไหว")).toBeInTheDocument();
+    expect(screen.queryByText("Movement ledger")).not.toBeInTheDocument();
+
     for (const label of ["รับเข้า", "ขาย", "ชำรุด", "ปรับยอด", "เปลี่ยนสินค้า"]) {
       expect(within(table).getByText(label)).toBeInTheDocument();
     }
