@@ -153,6 +153,22 @@ export interface InventoryDatabase {
         Args: { command: Json };
         Returns: Json;
       };
+      get_production_orders: {
+        Args: never;
+        Returns: Json;
+      };
+      save_production_order: {
+        Args: { command: Json };
+        Returns: Json;
+      };
+      cancel_production_order: {
+        Args: { command: Json };
+        Returns: Json;
+      };
+      receive_production_order: {
+        Args: { command: Json };
+        Returns: Json;
+      };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };

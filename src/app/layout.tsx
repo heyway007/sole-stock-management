@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Kanit } from "next/font/google";
 import { AppShell } from "@/components/app-shell";
 import { InventoryProvider } from "@/features/inventory/inventory-provider";
+import { ProductionOrderProvider } from "@/features/production-orders/production-order-provider";
 import "sweetalert2/dist/sweetalert2.min.css";
 import "./globals.css";
 
@@ -20,7 +21,13 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="th">
-      <body className={kanit.variable}><InventoryProvider><AppShell>{children}</AppShell></InventoryProvider></body>
+      <body className={kanit.variable}>
+        <InventoryProvider>
+          <ProductionOrderProvider>
+            <AppShell>{children}</AppShell>
+          </ProductionOrderProvider>
+        </InventoryProvider>
+      </body>
     </html>
   );
 }
