@@ -9,6 +9,7 @@ import { Field } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { Toast } from "@/components/ui/toast";
+import { ClearStockButton } from "@/features/inventory/components/clear-stock-button";
 import { RepositoryStatusBanner } from "@/features/inventory/components/repository-status-banner";
 import { StockStatus } from "@/features/inventory/components/stock-status";
 import { filterInventory, type InventoryFilters, type InventoryRow } from "@/features/inventory/domain/selectors";
@@ -28,7 +29,7 @@ function EditActions({ row, onEdit }: { row: InventoryRow; onEdit(row: Inventory
 }
 
 export function InventoryPageContent() {
-  const { snapshot, loading, error: repositoryError, saveLowStockThreshold } = useInventory();
+  const { snapshot, loading, error: repositoryError, clearStock, saveLowStockThreshold } = useInventory();
   const [filters, setFilters] = useState<InventoryFilters>(initialFilters);
   const [editingRow, setEditingRow] = useState<InventoryRow | null>(null);
   const [threshold, setThreshold] = useState("");
@@ -38,6 +39,16 @@ export function InventoryPageContent() {
 
   const rows = useMemo(() => snapshot ? filterInventory(snapshot, filters) : [], [filters, snapshot]);
   const totalPairs = useMemo(() => rows.reduce((total, row) => total + row.quantity, 0), [rows]);
+  const clearSummary = useMemo(() => {
+    if (!snapshot) return { positiveVariants: 0, totalPairs: 0 };
+    return Object.values(snapshot.balances).reduce(
+      (summary, quantity) => ({
+        positiveVariants: summary.positiveVariants + (quantity > 0 ? 1 : 0),
+        totalPairs: summary.totalPairs + quantity,
+      }),
+      { positiveVariants: 0, totalPairs: 0 },
+    );
+  }, [snapshot]);
   const models = snapshot?.models.filter((model) => model.active) ?? [];
   const colors = snapshot?.colors.filter((color) => color.active) ?? [];
 
@@ -86,9 +97,16 @@ export function InventoryPageContent() {
           <h1>สินค้าคงคลัง</h1>
           <p>ตรวจสอบจำนวนคงเหลือและตั้งค่าเกณฑ์แจ้งเตือนแต่ละไซซ์</p>
         </div>
-        <div className="inventory-summary" role="group" aria-label="สรุปสินค้าคงคลัง">
-          <span className="inventory-count"><strong>{rows.length}</strong><small>รายการ</small></span>
-          <span className="inventory-count"><strong>{totalPairs}</strong><small>คู่</small></span>
+        <div className="inventory-header-actions">
+          <div className="inventory-summary" role="group" aria-label="สรุปสินค้าคงคลัง">
+            <span className="inventory-count"><strong>{rows.length}</strong><small>รายการ</small></span>
+            <span className="inventory-count"><strong>{totalPairs}</strong><small>คู่</small></span>
+          </div>
+          <ClearStockButton
+            positiveVariants={clearSummary.positiveVariants}
+            totalPairs={clearSummary.totalPairs}
+            onClear={clearStock}
+          />
         </div>
       </header>
 

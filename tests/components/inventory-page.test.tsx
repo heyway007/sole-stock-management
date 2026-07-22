@@ -22,6 +22,16 @@ class FailingLoadRepository extends DemoInventoryRepository {
   }
 }
 
+class ZeroStockRepository extends DemoInventoryRepository {
+  override async load(): Promise<InventorySnapshot> {
+    const snapshot = await super.load();
+    return {
+      ...snapshot,
+      balances: Object.fromEntries(snapshot.variants.map((variant) => [variant.id, 0])),
+    };
+  }
+}
+
 function renderInventory() {
   const repository = new DemoInventoryRepository(new MemoryStorage());
   render(<InventoryProvider repository={repository}><InventoryPageContent /></InventoryProvider>);
@@ -68,6 +78,23 @@ describe("InventoryPage", () => {
 
     await user.type(screen.getByRole("searchbox", { name: "ค้นหาสินค้า" }), "ไม่มีสินค้านี้");
     expect(within(summary).getAllByText("0")).toHaveLength(2);
+  });
+
+  it("keeps clear stock enabled when filters hide globally available stock", async () => {
+    const user = userEvent.setup();
+    renderInventory();
+    const clearButton = await screen.findByRole("button", { name: "ล้างสต๊อก" });
+    expect(clearButton).toBeEnabled();
+
+    await user.type(screen.getByRole("searchbox", { name: "ค้นหาสินค้า" }), "ไม่มีสินค้านี้");
+    const summary = screen.getByRole("group", { name: "สรุปสินค้าคงคลัง" });
+    expect(within(summary).getAllByText("0")).toHaveLength(2);
+    expect(clearButton).toBeEnabled();
+  });
+
+  it("disables clear stock when every global balance is zero", async () => {
+    render(<InventoryProvider repository={new ZeroStockRepository(new MemoryStorage())}><InventoryPageContent /></InventoryProvider>);
+    expect(await screen.findByRole("button", { name: "ล้างสต๊อก" })).toBeDisabled();
   });
 
   it("searches decimal sizes and filters the same rows to low stock", async () => {

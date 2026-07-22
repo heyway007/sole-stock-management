@@ -234,10 +234,13 @@ button, input, select { font: inherit; }
 .form-field__error { color: #a63d31; font-size: 0.78rem; }
 
 .inventory-header { align-items: center; flex-wrap: wrap; }
-.inventory-summary { display: flex; flex-shrink: 0; gap: 10px; margin-left: auto; }
+.inventory-header-actions { display: grid; justify-items: end; gap: 10px; margin-left: auto; }
+.inventory-summary { display: flex; flex-shrink: 0; gap: 10px; }
 .inventory-count { min-width: 72px; display: flex; flex-direction: column; align-items: center; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); padding: 10px 14px; box-shadow: var(--shadow); }
 .inventory-count strong { font-size: 1.35rem; line-height: 1.1; }
 .inventory-count small { color: var(--muted); }
+.clear-stock-button { color: #a63d31; border-color: #e3b8b1; background: #fff7f5; }
+.clear-stock-button:hover:not(:disabled) { color: #8f3027; border-color: #d9988e; background: #ffebe7; }
 .filter-panel { display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 18px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); padding: 16px; box-shadow: var(--shadow); }
 .reset-filter { align-self: end; }
 .inventory-results { min-width: 0; }
@@ -283,7 +286,9 @@ button, input, select { font: inherit; }
 
 @media (max-width: 559px) {
   .inventory-header > div:first-child { min-width: 0; flex: 1 1 100%; }
-  .inventory-summary { width: 100%; justify-content: flex-end; }
+  .inventory-header-actions { width: 100%; }
+  .inventory-summary { justify-content: flex-end; }
+  .clear-stock-button { width: 100%; }
 }
 
 @media (min-width: 560px) {
