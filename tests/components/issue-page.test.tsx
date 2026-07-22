@@ -101,4 +101,35 @@ describe("IssuePage", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("จำนวนที่นำออกเกินสต็อกคงเหลือ");
     expect(repository.inputs).toHaveLength(0);
   });
+
+  it("maps a decrease adjustment to OUT", async () => {
+    const user = userEvent.setup();
+    const repository = renderIssue();
+    await screen.findByRole("heading", { name: "นำสินค้าออก" });
+    await user.selectOptions(screen.getByRole("combobox", { name: "เหตุผลการนำออก" }), "ปรับยอด");
+    await user.selectOptions(screen.getByRole("combobox", { name: "ทิศทางการปรับยอด" }), "ลดยอด");
+    await fillLine(user, 1, "38", "1");
+
+    await user.click(screen.getByRole("button", { name: "บันทึกการนำออก" }));
+
+    expect(await screen.findByRole("status", { name: "บันทึกสำเร็จ" })).toBeInTheDocument();
+    expect(repository.inputs[0]).toMatchObject({
+      type: "ADJUSTMENT",
+      lines: [{ direction: "OUT", quantity: 1 }],
+    });
+  });
+
+  it("blocks a decrease adjustment above stock before calling the repository", async () => {
+    const user = userEvent.setup();
+    const repository = renderIssue();
+    await screen.findByRole("heading", { name: "นำสินค้าออก" });
+    await user.selectOptions(screen.getByRole("combobox", { name: "เหตุผลการนำออก" }), "ปรับยอด");
+    await user.selectOptions(screen.getByRole("combobox", { name: "ทิศทางการปรับยอด" }), "ลดยอด");
+    await fillLine(user, 1, "38", "3");
+
+    await user.click(screen.getByRole("button", { name: "บันทึกการนำออก" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("จำนวนที่นำออกเกินสต็อกคงเหลือ");
+    expect(repository.inputs).toHaveLength(0);
+  });
 });

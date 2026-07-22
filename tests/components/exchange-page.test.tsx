@@ -2,7 +2,8 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import { ExchangePageContent } from "@/app/exchange/page";
-import { DemoInventoryRepository } from "@/features/inventory/data/demo-repository";
+import { DemoInventoryRepository, INVENTORY_STORAGE_KEY } from "@/features/inventory/data/demo-repository";
+import { createSeedSnapshot } from "@/features/inventory/data/seed";
 import type { StockDocumentInput } from "@/features/inventory/domain/types";
 import { InventoryProvider } from "@/features/inventory/inventory-provider";
 
@@ -18,14 +19,18 @@ class MemoryStorage implements Storage {
 
 class ExchangeRepository extends DemoInventoryRepository {
   readonly inputs: StockDocumentInput[] = [];
+  failNext = false;
   override async postDocument(input: StockDocumentInput) {
     this.inputs.push(input);
+    if (this.failNext) {
+      this.failNext = false;
+      throw new Error("network failed");
+    }
     return super.postDocument(input);
   }
 }
 
-function renderExchange() {
-  const repository = new ExchangeRepository(new MemoryStorage());
+function renderExchange(repository = new ExchangeRepository(new MemoryStorage())) {
   render(<InventoryProvider repository={repository}><ExchangePageContent /></InventoryProvider>);
   return repository;
 }
@@ -89,5 +94,47 @@ describe("ExchangePage", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("สินค้าทดแทนมีจำนวนไม่เพียงพอ");
     expect(screen.queryByRole("dialog", { name: "ยืนยันการเปลี่ยนสินค้า" })).not.toBeInTheDocument();
     expect(repository.inputs).toHaveLength(0);
+  });
+
+  it("allows a zero-balance variant returned and replaced atomically with a non-negative projection", async () => {
+    const user = userEvent.setup();
+    const storage = new MemoryStorage();
+    const snapshot = createSeedSnapshot();
+    snapshot.balances["paris-black-38"] = 0;
+    storage.setItem(INVENTORY_STORAGE_KEY, JSON.stringify(snapshot));
+    const repository = renderExchange(new ExchangeRepository(storage));
+    await screen.findByRole("heading", { name: "เปลี่ยนสินค้า" });
+    await fillSection(user, "สินค้าที่รับคืน", "38", "1");
+    await fillSection(user, "สินค้าที่ส่งทดแทน", "38", "1");
+
+    await user.click(screen.getByRole("button", { name: "ตรวจสอบการเปลี่ยน" }));
+    expect(await screen.findByRole("dialog", { name: "ยืนยันการเปลี่ยนสินค้า" })).toBeInTheDocument();
+    expect(repository.inputs).toHaveLength(0);
+  });
+
+  it("preserves both line sections and the confirmation state when the repository rejects so it can retry", async () => {
+    const user = userEvent.setup();
+    const repository = renderExchange();
+    repository.failNext = true;
+    await screen.findByRole("heading", { name: "เปลี่ยนสินค้า" });
+    await fillSection(user, "สินค้าที่รับคืน", "38", "1");
+    await fillSection(user, "สินค้าที่ส่งทดแทน", "38.5", "2");
+    await user.type(screen.getByRole("textbox", { name: "เลขอ้างอิง" }), "EX-401");
+    await user.click(screen.getByRole("button", { name: "ตรวจสอบการเปลี่ยน" }));
+    let dialog = await screen.findByRole("dialog", { name: "ยืนยันการเปลี่ยนสินค้า" });
+
+    await user.click(within(dialog).getByRole("button", { name: "ยืนยันและบันทึก" }));
+
+    dialog = await screen.findByRole("dialog", { name: "ยืนยันการเปลี่ยนสินค้า" });
+    expect(within(dialog).getByRole("alert")).toHaveTextContent("ไม่สามารถบันทึกข้อมูลได้");
+    expect(within(dialog).getByRole("list", { name: "สรุปการเปลี่ยนสินค้า" })).toHaveTextContent("+1 คู่");
+    expect(within(dialog).getByRole("list", { name: "สรุปการเปลี่ยนสินค้า" })).toHaveTextContent("−2 คู่");
+    expect(within(screen.getByRole("region", { name: "สินค้าที่รับคืน" })).getByRole("spinbutton", { name: "จำนวน (คู่) รายการ 1" })).toHaveValue(1);
+    expect(within(screen.getByRole("region", { name: "สินค้าที่ส่งทดแทน" })).getByRole("spinbutton", { name: "จำนวน (คู่) รายการ 1" })).toHaveValue(2);
+    expect(screen.getByRole("textbox", { name: "เลขอ้างอิง" })).toHaveValue("EX-401");
+
+    await user.click(within(dialog).getByRole("button", { name: "ยืนยันและบันทึก" }));
+    expect(await screen.findByRole("status", { name: "บันทึกสำเร็จ" })).toHaveTextContent("เปลี่ยนสินค้าเรียบร้อย");
+    expect(repository.inputs).toHaveLength(2);
   });
 });

@@ -15,6 +15,15 @@ function dirty(line: DocumentLineDraft) {
   return !!(line.modelId || line.colorId || line.variantId || line.quantity);
 }
 
+function hasNegativeProjection(command: StockDocumentInput, variants: DocumentVariantOption[]): boolean {
+  const projected = new Map(variants.map((variant) => [variant.id, variant.available]));
+  for (const line of command.lines) {
+    const delta = line.section === "RETURNED" ? line.quantity : -line.quantity;
+    projected.set(line.variantId, (projected.get(line.variantId) ?? 0) + delta);
+  }
+  return [...projected.values()].some((quantity) => quantity < 0);
+}
+
 export function ExchangePageContent() {
   const { snapshot, loading, error, postDocument } = useInventory();
   const [returnedLines, setReturnedLines] = useState<DocumentLineDraft[]>(() => [createDocumentLine()]);
@@ -59,7 +68,7 @@ export function ExchangePageContent() {
     };
     const validation = validateDocument(command);
     if (!validation.success) throw new Error(validation.errors[0].message);
-    if (validation.data.lines.some((line) => line.section === "REPLACEMENT" && line.quantity > (variants.find((variant) => variant.id === line.variantId)?.available ?? 0))) {
+    if (hasNegativeProjection(validation.data, variants)) {
       throw new Error("สินค้าทดแทนมีจำนวนไม่เพียงพอ");
     }
     setConfirmationError(null);
