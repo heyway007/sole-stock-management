@@ -106,6 +106,41 @@ describe("DemoInventoryRepository", () => {
     expect(posted.lines[0].id).toBe("line-random");
   });
 
+  it("clears every positive balance in one audited adjustment and keeps the catalog", async () => {
+    const repository = new DemoInventoryRepository(new MemoryStorage());
+    const seeded = await repository.load();
+    const firstVariant = seeded.variants[0];
+    await repository.postDocument({
+      type: "RECEIPT",
+      effectiveDate: "2026-07-21",
+      reference: "BEFORE-CLEAR",
+      lines: [{ variantId: firstVariant.id, size: firstVariant.size, quantity: 1 }],
+    });
+    const before = await repository.load();
+    const totalBefore = Object.values(before.balances).reduce((total, quantity) => total + quantity, 0);
+
+    const cleared = await repository.clearStock("2026-07-22");
+    const after = await repository.load();
+
+    expect(cleared).toMatchObject({
+      type: "ADJUSTMENT",
+      effectiveDate: "2026-07-22",
+      reference: "CLEAR-STOCK",
+      note: "ล้างสต๊อกทั้งคลัง",
+    });
+    expect(cleared?.lines.reduce((total, line) => total + line.delta, 0)).toBe(-totalBefore);
+    expect(cleared?.lines.every((line) => line.delta < 0)).toBe(true);
+    expect(Object.values(after.balances).every((quantity) => quantity === 0)).toBe(true);
+    expect(after.models).toEqual(before.models);
+    expect(after.colors).toEqual(before.colors);
+    expect(after.variants).toEqual(before.variants);
+    expect(after.documents.slice(0, -1)).toEqual(before.documents);
+    expect(after.documents.at(-1)).toEqual(cleared);
+
+    await expect(repository.clearStock("2026-07-22")).resolves.toBeNull();
+    expect((await repository.load()).documents).toEqual(after.documents);
+  });
+
   it("serializes cross-repository mutations and advances a persisted snapshot revision", async () => {
     const storage = new MemoryStorage();
     const lockManager = new SerialLockManager();

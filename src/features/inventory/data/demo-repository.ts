@@ -200,26 +200,25 @@ export class DemoInventoryRepository implements InventoryRepository {
   }
 
   async postDocument(input: StockDocumentInput): Promise<StockDocument> {
+    return this.mutate((current) => this.projectDocument(current, input));
+  }
+
+  async clearStock(effectiveDate: string): Promise<StockDocument | null> {
     return this.mutate((current) => {
-      const ordinal = current.documents.length + 1;
-      const documentId = this.createId();
-      const lineIds = input.lines.map(() => this.createId());
-      let next: InventorySnapshot;
-      try {
-        next = postDocument(current, input, {
-          documentId: () => documentId,
-          lineId: (index) => lineIds[index],
-          documentNumber: () => `STK-${input.effectiveDate.replaceAll("-", "")}-${String(ordinal).padStart(4, "0")}`,
-          now: () => new Date().toISOString(),
-        });
-      } catch (error) {
-        throw errorForPost(error);
-      }
-      const document = next.documents.at(-1)!;
-      return {
-        snapshot: next,
-        result: { ...document, lines: document.lines.map((line) => ({ ...line })) },
-      };
+      const lines = current.variants.flatMap((variant) => {
+        const quantity = current.balances[variant.id] ?? 0;
+        return quantity > 0
+          ? [{ variantId: variant.id, size: variant.size, quantity, direction: "OUT" as const }]
+          : [];
+      });
+      if (lines.length === 0) return { snapshot: current, result: null };
+      return this.projectDocument(current, {
+        type: "ADJUSTMENT",
+        effectiveDate,
+        reference: "CLEAR-STOCK",
+        note: "ล้างสต๊อกทั้งคลัง",
+        lines,
+      });
     });
   }
 
@@ -336,6 +335,31 @@ export class DemoInventoryRepository implements InventoryRepository {
       }
     }
     return null;
+  }
+
+  private projectDocument(
+    current: InventorySnapshot,
+    input: StockDocumentInput,
+  ): { snapshot: InventorySnapshot; result: StockDocument } {
+    const ordinal = current.documents.length + 1;
+    const documentId = this.createId();
+    const lineIds = input.lines.map(() => this.createId());
+    let next: InventorySnapshot;
+    try {
+      next = postDocument(current, input, {
+        documentId: () => documentId,
+        lineId: (index) => lineIds[index],
+        documentNumber: () => `STK-${input.effectiveDate.replaceAll("-", "")}-${String(ordinal).padStart(4, "0")}`,
+        now: () => new Date().toISOString(),
+      });
+    } catch (error) {
+      throw errorForPost(error);
+    }
+    const document = next.documents.at(-1)!;
+    return {
+      snapshot: next,
+      result: { ...document, lines: document.lines.map((line) => ({ ...line })) },
+    };
   }
 
   private current(): InventorySnapshot {

@@ -149,6 +149,10 @@ export interface InventoryDatabase {
         Args: { command: Json };
         Returns: Json;
       };
+      clear_inventory_stock: {
+        Args: { command: Json };
+        Returns: Json;
+      };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };

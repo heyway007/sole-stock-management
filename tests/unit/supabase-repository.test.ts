@@ -120,6 +120,19 @@ function document(id: string, number: string): StockDocument {
   };
 }
 
+function clearedDocument(): StockDocument {
+  return {
+    id: "clear-document",
+    number: "STK-20260722-000010",
+    type: "ADJUSTMENT",
+    effectiveDate: "2026-07-22",
+    reference: "CLEAR-STOCK",
+    note: "ล้างสต๊อกทั้งคลัง",
+    createdAt: "2026-07-22T10:00:00.000Z",
+    lines: [{ id: "clear-line", variantId: "variant-1", delta: -7 }],
+  };
+}
+
 function snapshotPayload() {
   return {
     models: [{ id: "model-1", name: "Paris", active: true }],
@@ -155,6 +168,49 @@ function snapshotPayload() {
 }
 
 describe("SupabaseInventoryRepository client contract", () => {
+  it("clears stock through the dedicated RPC and maps an audited document or null", async () => {
+    const client = new ContractClient();
+    client.rpcResults.push(
+      { data: clearedDocument() as unknown as Json, error: null },
+      { data: null, error: null },
+    );
+    const requestIds = [
+      "00000000-0000-4000-8000-000000000041",
+      "00000000-0000-4000-8000-000000000042",
+    ];
+    const repository = new SupabaseInventoryRepository(
+      "https://example.supabase.co",
+      "anon",
+      asClient(client),
+      () => requestIds.shift()!,
+    );
+
+    await expect(repository.clearStock("2026-07-22")).resolves.toEqual(clearedDocument());
+    await expect(repository.clearStock("2026-07-22")).resolves.toBeNull();
+    expect(client.rpcCalls).toEqual([
+      {
+        name: "clear_inventory_stock",
+        args: { command: { requestId: "00000000-0000-4000-8000-000000000041", effectiveDate: "2026-07-22" } },
+      },
+      {
+        name: "clear_inventory_stock",
+        args: { command: { requestId: "00000000-0000-4000-8000-000000000042", effectiveDate: "2026-07-22" } },
+      },
+    ]);
+  });
+
+  it("maps a clear-stock RPC failure to the shared Thai save error", async () => {
+    const client = new ContractClient();
+    client.rpcResults.push({
+      data: null,
+      error: { code: "503", message: "network unavailable", details: "", hint: "" },
+    });
+    const repository = new SupabaseInventoryRepository("https://example.supabase.co", "anon", asClient(client));
+
+    await expect(repository.clearStock("2026-07-22"))
+      .rejects.toThrow("ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้ง");
+  });
+
   it("loads one coherent snapshot RPC payload with multiple documents and ordered lines", async () => {
     const client = new ContractClient();
     client.rpcResults.push({

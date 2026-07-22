@@ -462,6 +462,14 @@ export class SupabaseInventoryRepository implements InventoryRepository {
     }
   }
 
+  async clearStock(effectiveDate: string): Promise<StockDocument | null> {
+    const result = await this.client.rpc("clear_inventory_stock", {
+      command: { requestId: this.createRequestId(), effectiveDate },
+    });
+    throwFor(result.error);
+    return result.data === null ? null : postedDocument(result.data);
+  }
+
   private pendingEntryKey(fingerprint: string): string {
     return `${this.url}\u0000${fingerprint}`;
   }

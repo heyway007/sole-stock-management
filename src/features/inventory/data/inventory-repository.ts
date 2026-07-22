@@ -4,6 +4,7 @@ export interface InventoryRepository {
   load(): Promise<InventorySnapshot>;
   subscribe?(listener: () => void): () => void;
   postDocument(input: StockDocumentInput): Promise<StockDocument>;
+  clearStock(effectiveDate: string): Promise<StockDocument | null>;
   ensureVariant(modelId: string, colorId: string, size: number): Promise<ProductVariant>;
   saveLowStockThreshold(variantId: string, threshold: number): Promise<void>;
   addModel(name: string): Promise<ShoeModel>;
