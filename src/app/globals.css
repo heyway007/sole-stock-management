@@ -478,3 +478,15 @@ button, input, select { font: inherit; }
   .production-order-table-wrap { display: block; }
   .production-order-card-list { display: none; }
 }
+
+/* Production order create/edit form */
+.production-form-header { align-items: center; flex-wrap: wrap; }
+.production-order-metadata { display: grid; gap: 13px; }
+.production-order-form-summary { border: 1px solid #badbca; border-radius: 13px; color: var(--forest-800); background: #edf7f1; padding: 12px 15px; font-weight: 800; text-align: right; }
+.production-terminal-state { text-align: center; }
+.production-terminal-state > div { display: grid; justify-items: center; gap: 12px; }
+.production-terminal-state h1, .production-terminal-state p { margin: 0; }
+
+@media (min-width: 600px) {
+  .production-order-metadata { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
