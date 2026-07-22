@@ -87,4 +87,23 @@ describe("Supabase inventory migration ACL", () => {
     expect(productionMigration).toContain("grant execute on function public.cancel_production_order(jsonb) to anon, authenticated;");
     expect(productionMigration).not.toMatch(/grant\s+(?:insert|update|delete)\s+on\s+public\.production_/);
   });
+
+  it("receives a production order atomically through the stock ledger RPC", () => {
+    const productionMigration = readFileSync(
+      resolve(process.cwd(), "supabase/migrations/202607220004_production_orders.sql"),
+      "utf8",
+    ).replaceAll("\r\n", "\n").toLocaleLowerCase("en-US");
+
+    expect(productionMigration).toContain("create or replace function public.receive_production_order(command jsonb)");
+    expect(productionMigration).toContain("pg_catalog.pg_advisory_xact_lock");
+    expect(productionMigration).toMatch(/from public\.production_orders production_order[\s\S]*?for update of production_order/);
+    expect(productionMigration).toContain("if locked_order.status = 'received'");
+    expect(productionMigration).toContain("where document.id = locked_order.received_document_id");
+    expect(productionMigration).toContain("'requestid', receipt_request_id");
+    expect(productionMigration).toContain("'type', 'receipt'");
+    expect(productionMigration).toContain("'reference', locked_order.order_number");
+    expect(productionMigration).toContain("posted_document := public.post_stock_document(receipt_command);");
+    expect(productionMigration).toMatch(/update public\.production_orders[\s\S]*?received_document_id[\s\S]*?status = 'received'/);
+    expect(productionMigration).toContain("grant execute on function public.receive_production_order(jsonb) to anon, authenticated;");
+  });
 });

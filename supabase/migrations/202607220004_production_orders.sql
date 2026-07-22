@@ -314,6 +314,120 @@ begin
 end;
 $$;
 
+create or replace function public.receive_production_order(command jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  request_id uuid;
+  target_order_id uuid;
+  effective_on date;
+  locked_order public.production_orders%rowtype;
+  receipt_request_id uuid;
+  receipt_lines jsonb;
+  receipt_command jsonb;
+  posted_document jsonb;
+begin
+  if command is null
+    or pg_catalog.jsonb_typeof(command) is distinct from 'object'
+    or pg_catalog.jsonb_typeof(command -> 'requestId') is distinct from 'string'
+    or command ->> 'requestId' !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+    or pg_catalog.jsonb_typeof(command -> 'orderId') is distinct from 'string'
+    or command ->> 'orderId' !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+    or pg_catalog.jsonb_typeof(command -> 'effectiveDate') is distinct from 'string'
+    or command ->> 'effectiveDate' !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' then
+    raise exception using errcode = 'P0001', message = 'INVALID_PRODUCTION_ORDER_RECEIPT';
+  end if;
+
+  request_id := (command ->> 'requestId')::uuid;
+  target_order_id := (command ->> 'orderId')::uuid;
+  begin
+    effective_on := (command ->> 'effectiveDate')::date;
+  exception when others then
+    raise exception using errcode = 'P0001', message = 'INVALID_PRODUCTION_ORDER_RECEIPT';
+  end;
+  if pg_catalog.to_char(effective_on, 'YYYY-MM-DD') <> command ->> 'effectiveDate' then
+    raise exception using errcode = 'P0001', message = 'INVALID_PRODUCTION_ORDER_RECEIPT';
+  end if;
+
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended(request_id::text, 0)
+  );
+
+  select production_order.* into locked_order
+  from public.production_orders production_order
+  where production_order.id = target_order_id
+  for update of production_order;
+  if not found then
+    raise exception using errcode = 'P0001', message = 'PRODUCTION_ORDER_NOT_FOUND';
+  end if;
+
+  if locked_order.status = 'RECEIVED' then
+    select document.client_request_id into receipt_request_id
+    from public.stock_documents document
+    where document.id = locked_order.received_document_id;
+    if receipt_request_id is null then
+      raise exception using errcode = 'P0001', message = 'PRODUCTION_ORDER_RECEIPT_NOT_FOUND';
+    end if;
+    posted_document := public.post_stock_document(
+      pg_catalog.jsonb_build_object('requestId', receipt_request_id)
+    );
+    return pg_catalog.jsonb_build_object(
+      'order', public.production_order_json(locked_order.id),
+      'document', posted_document
+    );
+  end if;
+
+  if locked_order.status = 'CANCELLED' then
+    raise exception using errcode = 'P0001', message = 'PRODUCTION_ORDER_CANCELLED';
+  end if;
+
+  if exists (
+    select 1 from public.stock_documents document
+    where document.client_request_id = request_id
+  ) then
+    raise exception using errcode = 'P0001', message = 'INVALID_PRODUCTION_ORDER_RECEIPT';
+  end if;
+
+  select pg_catalog.jsonb_agg(
+    pg_catalog.jsonb_build_object(
+      'variantId', line.variant_id,
+      'size', line.size,
+      'quantity', line.quantity
+    ) order by line.line_number
+  ) into receipt_lines
+  from public.production_order_lines line
+  where line.order_id = target_order_id;
+  if receipt_lines is null or pg_catalog.jsonb_array_length(receipt_lines) = 0 then
+    raise exception using errcode = 'P0001', message = 'INVALID_PRODUCTION_ORDER_RECEIPT';
+  end if;
+
+  receipt_command := pg_catalog.jsonb_build_object(
+    'requestId', request_id,
+    'type', 'RECEIPT',
+    'effectiveDate', effective_on::text,
+    'reference', locked_order.order_number,
+    'note', 'รับเข้าจากใบผลิต ' || locked_order.order_number,
+    'lines', receipt_lines
+  );
+  posted_document := public.post_stock_document(receipt_command);
+
+  update public.production_orders
+  set received_document_id = (posted_document ->> 'id')::uuid,
+      status = 'RECEIVED',
+      received_at = statement_timestamp(),
+      updated_at = statement_timestamp()
+  where id = target_order_id;
+
+  return pg_catalog.jsonb_build_object(
+    'order', public.production_order_json(target_order_id),
+    'document', posted_document
+  );
+end;
+$$;
+
 alter table public.production_orders enable row level security;
 alter table public.production_order_lines enable row level security;
 
@@ -326,12 +440,15 @@ alter function public.production_order_json(uuid) owner to postgres;
 alter function public.get_production_orders() owner to postgres;
 alter function public.save_production_order(jsonb) owner to postgres;
 alter function public.cancel_production_order(jsonb) owner to postgres;
+alter function public.receive_production_order(jsonb) owner to postgres;
 
 revoke all on function public.production_order_json(uuid) from public, anon, authenticated;
 revoke all on function public.get_production_orders() from public, anon, authenticated;
 revoke all on function public.save_production_order(jsonb) from public, anon, authenticated;
 revoke all on function public.cancel_production_order(jsonb) from public, anon, authenticated;
+revoke all on function public.receive_production_order(jsonb) from public, anon, authenticated;
 
 grant execute on function public.get_production_orders() to anon, authenticated;
 grant execute on function public.save_production_order(jsonb) to anon, authenticated;
 grant execute on function public.cancel_production_order(jsonb) to anon, authenticated;
+grant execute on function public.receive_production_order(jsonb) to anon, authenticated;
