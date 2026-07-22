@@ -64,4 +64,27 @@ describe("Supabase inventory migration ACL", () => {
     expect(clearMigration).toContain("grant execute on function public.clear_inventory_stock(jsonb) to anon, authenticated;");
     expect(clearMigration).not.toMatch(/grant\s+(?:insert|update|delete)\s+on\s+public\./);
   });
+
+  it("ships production-order persistence with canonical snapshots and narrow RPC grants", () => {
+    const productionMigration = readFileSync(
+      resolve(process.cwd(), "supabase/migrations/202607220004_production_orders.sql"),
+      "utf8",
+    ).replaceAll("\r\n", "\n").toLocaleLowerCase("en-US");
+
+    expect(productionMigration).toContain("create table public.production_orders");
+    expect(productionMigration).toContain("create table public.production_order_lines");
+    expect(productionMigration).toContain("check (status in ('open', 'received', 'cancelled'))");
+    expect(productionMigration).toContain("unique (order_id, variant_id)");
+    expect(productionMigration).toContain("create or replace function public.production_order_json(target_order_id uuid)");
+    expect(productionMigration).toContain("create or replace function public.get_production_orders()");
+    expect(productionMigration).toContain("create or replace function public.save_production_order(command jsonb)");
+    expect(productionMigration).toContain("create or replace function public.cancel_production_order(command jsonb)");
+    expect(productionMigration).toContain("for update of production_order");
+    expect(productionMigration).toContain("join public.shoe_models model");
+    expect(productionMigration).toContain("join public.colors color");
+    expect(productionMigration).toContain("grant execute on function public.get_production_orders() to anon, authenticated;");
+    expect(productionMigration).toContain("grant execute on function public.save_production_order(jsonb) to anon, authenticated;");
+    expect(productionMigration).toContain("grant execute on function public.cancel_production_order(jsonb) to anon, authenticated;");
+    expect(productionMigration).not.toMatch(/grant\s+(?:insert|update|delete)\s+on\s+public\.production_/);
+  });
 });
