@@ -440,3 +440,41 @@ button, input, select { font: inherit; }
   .history-filters .button { justify-self: auto; padding-inline: 12px; }
   .catalog-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
 }
+
+/* Production order list */
+.production-orders-header { align-items: center; flex-wrap: wrap; }
+.production-orders-header__actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 12px; margin-left: auto; }
+.production-order-summary { display: flex; gap: 10px; }
+.production-create-link { min-height: 44px; }
+.production-order-filters { display: grid; gap: 12px; margin-bottom: 18px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); padding: 16px; box-shadow: var(--shadow); }
+.production-order-filters .button { align-self: end; }
+.production-order-table-wrap { display: none; overflow-x: auto; }
+.production-order-table { min-width: 780px; }
+.production-order-table a { color: var(--forest-800); }
+.production-order-table a:hover { color: var(--green-600); }
+.production-order-card-list { display: grid; gap: 12px; }
+.production-order-card { min-width: 0; display: block; border: 1px solid var(--line); border-radius: 17px; color: inherit; background: var(--surface); padding: 16px; box-shadow: var(--shadow); }
+.production-order-card > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.production-order-card > header > div { min-width: 0; display: grid; gap: 3px; }
+.production-order-card > header strong { overflow-wrap: anywhere; }
+.production-order-card > header span { color: var(--muted); font-size: 0.78rem; }
+.production-order-card dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; margin: 14px 0 0; }
+.production-order-card dl > div { min-width: 0; border-radius: 10px; background: #f4f5f2; padding: 9px 10px; }
+.production-order-card dl > div:last-child { grid-column: 1 / -1; }
+.production-order-card dt { color: var(--muted); font-size: 0.7rem; }
+.production-order-card dd { margin: 2px 0 0; font-size: 0.88rem; font-weight: 800; }
+
+@media (max-width: 559px) {
+  .production-orders-header__actions { width: 100%; justify-content: stretch; }
+  .production-order-summary { width: 100%; justify-content: flex-end; }
+  .production-create-link { width: 100%; }
+}
+
+@media (min-width: 600px) {
+  .production-order-filters { grid-template-columns: minmax(0, 1fr) minmax(180px, 0.45fr) auto; align-items: end; }
+}
+
+@media (min-width: 768px) {
+  .production-order-table-wrap { display: block; }
+  .production-order-card-list { display: none; }
+}

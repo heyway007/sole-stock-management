@@ -14,6 +14,7 @@ const expectedLinks = [
   ["รับสินค้า", "/receive"],
   ["นำสินค้าออก", "/issue"],
   ["เปลี่ยนสินค้า", "/exchange"],
+  ["ใบผลิตออเดอร์", "/production-orders"],
   ["ประวัติ", "/history"],
   ["จัดการสินค้า", "/catalog"],
 ] as const;
@@ -46,7 +47,7 @@ function renderShell(mode: "demo" | "supabase" = "demo") {
 describe("AppShell", () => {
   afterEach(cleanup);
 
-  it("offers all seven destinations in accessible desktop and mobile navigation", () => {
+  it("offers all eight destinations in accessible desktop and mobile navigation", () => {
     renderShell();
 
     const desktop = screen.getByRole("navigation", { name: "เมนูหลัก" });

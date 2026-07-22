@@ -7,6 +7,7 @@ import {
   ArrowLeftRight,
   ArrowUpFromLine,
   Boxes,
+  ClipboardList,
   History,
   LayoutDashboard,
   Settings2,
@@ -26,6 +27,7 @@ const navigationItems: NavigationItem[] = [
   { href: "/receive", label: "รับสินค้า", icon: ArrowDownToLine },
   { href: "/issue", label: "นำสินค้าออก", icon: ArrowUpFromLine },
   { href: "/exchange", label: "เปลี่ยนสินค้า", icon: ArrowLeftRight },
+  { href: "/production-orders", label: "ใบผลิตออเดอร์", icon: ClipboardList },
   { href: "/history", label: "ประวัติ", icon: History },
   { href: "/catalog", label: "จัดการสินค้า", icon: Settings2 },
 ];
