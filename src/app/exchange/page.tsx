@@ -7,21 +7,21 @@ import { Toast } from "@/components/ui/toast";
 import { DocumentForm, type DocumentMetadata } from "@/features/inventory/components/document-form";
 import { createDocumentLine, DocumentLineEditor, type DocumentLineDraft, type DocumentVariantOption } from "@/features/inventory/components/document-line-editor";
 import { ExchangePreview } from "@/features/inventory/components/exchange-preview";
-import type { StockDocumentInput } from "@/features/inventory/domain/types";
-import { validateDocument } from "@/features/inventory/domain/validation";
-import { InventoryProvider, useInventory } from "@/features/inventory/inventory-provider";
+import type { StockDocumentInput, ValidationError } from "@/features/inventory/domain/types";
+import { DocumentValidationError, validateDocument } from "@/features/inventory/domain/validation";
+import { useInventory } from "@/features/inventory/inventory-provider";
 
 function dirty(line: DocumentLineDraft) {
   return !!(line.modelId || line.colorId || line.variantId || line.quantity);
 }
 
-function hasNegativeProjection(command: StockDocumentInput, variants: DocumentVariantOption[]): boolean {
+function negativeProjectionVariantIds(command: StockDocumentInput, variants: DocumentVariantOption[]): Set<string> {
   const projected = new Map(variants.map((variant) => [variant.id, variant.available]));
   for (const line of command.lines) {
     const delta = line.section === "RETURNED" ? line.quantity : -line.quantity;
     projected.set(line.variantId, (projected.get(line.variantId) ?? 0) + delta);
   }
-  return [...projected.values()].some((quantity) => quantity < 0);
+  return new Set([...projected.entries()].filter(([, quantity]) => quantity < 0).map(([variantId]) => variantId));
 }
 
 export function ExchangePageContent() {
@@ -56,7 +56,14 @@ export function ExchangePageContent() {
     const hasReturned = returnedLines.some((line) => line.variantId || line.quantity);
     const hasReplacement = replacementLines.some((line) => line.variantId || line.quantity);
     if (!hasReturned || !hasReplacement) {
-      throw new Error("รายการแลกเปลี่ยนต้องมีทั้งรายการคืนและรายการทดแทน");
+      const errors: ValidationError[] = [];
+      if (!hasReturned) {
+        errors.push({ path: "lines.0.variantId", code: "INVALID_EXCHANGE", message: "รายการแลกเปลี่ยนต้องมีทั้งรายการคืนและรายการทดแทน" });
+      }
+      if (!hasReplacement) {
+        errors.push({ path: `lines.${returnedLines.length}.variantId`, code: "INVALID_EXCHANGE", message: "รายการแลกเปลี่ยนต้องมีทั้งรายการคืนและรายการทดแทน" });
+      }
+      throw new DocumentValidationError(errors);
     }
     const command: StockDocumentInput = {
       type: "EXCHANGE",
@@ -67,9 +74,15 @@ export function ExchangePageContent() {
       ],
     };
     const validation = validateDocument(command);
-    if (!validation.success) throw new Error(validation.errors[0].message);
-    if (hasNegativeProjection(validation.data, variants)) {
-      throw new Error("สินค้าทดแทนมีจำนวนไม่เพียงพอ");
+    if (!validation.success) throw new DocumentValidationError(validation.errors);
+    const negativeVariants = negativeProjectionVariantIds(validation.data, variants);
+    const stockErrors = validation.data.lines.flatMap((line, index): ValidationError[] =>
+      line.section === "REPLACEMENT" && negativeVariants.has(line.variantId)
+        ? [{ path: `lines.${index}.quantity`, code: "INVALID_QUANTITY", message: "สินค้าทดแทนมีจำนวนไม่เพียงพอ" }]
+        : [],
+    );
+    if (stockErrors.length > 0) {
+      throw new DocumentValidationError(stockErrors);
     }
     setConfirmationError(null);
     setPending(validation.data);
@@ -110,7 +123,7 @@ export function ExchangePageContent() {
       >
         <div className="exchange-columns">
           <DocumentLineEditor title="สินค้าที่รับคืน" section="RETURNED" lines={returnedLines} onChange={setReturnedLines} variants={variants} showAvailable={false} />
-          <DocumentLineEditor title="สินค้าที่ส่งทดแทน" section="REPLACEMENT" lines={replacementLines} onChange={setReplacementLines} variants={variants} showAvailable />
+          <DocumentLineEditor title="สินค้าที่ส่งทดแทน" section="REPLACEMENT" lines={replacementLines} onChange={setReplacementLines} variants={variants} showAvailable lineIndexOffset={returnedLines.length} />
         </div>
       </DocumentForm>
 
@@ -130,5 +143,5 @@ export function ExchangePageContent() {
 }
 
 export default function ExchangePage() {
-  return <InventoryProvider><ExchangePageContent /></InventoryProvider>;
+  return <ExchangePageContent />;
 }

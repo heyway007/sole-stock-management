@@ -13,6 +13,28 @@ class MemoryStorage implements Storage {
   setItem(key: string, value: string) { this.values.set(key, value); }
 }
 
+class SerialLockManager {
+  calls = 0;
+  maxActive = 0;
+  private active = 0;
+  private tail = Promise.resolve();
+
+  request<T>(_name: string, callback: () => Promise<T> | T): Promise<T> {
+    this.calls += 1;
+    const run = this.tail.then(async () => {
+      this.active += 1;
+      this.maxActive = Math.max(this.maxActive, this.active);
+      try {
+        return await callback();
+      } finally {
+        this.active -= 1;
+      }
+    });
+    this.tail = run.then(() => undefined, () => undefined);
+    return run;
+  }
+}
+
 describe("DemoInventoryRepository", () => {
   it("loads the deterministic initial seed", async () => {
     const snapshot = await new DemoInventoryRepository(new MemoryStorage()).load();
@@ -27,6 +49,130 @@ describe("DemoInventoryRepository", () => {
     await new DemoInventoryRepository(storage).addModel("  Runner  ");
     const snapshot = await new DemoInventoryRepository(storage).load();
     expect(snapshot.models).toContainEqual(expect.objectContaining({ name: "Runner", active: true }));
+  });
+
+  it("keeps catalog identities stable when a renamed model or color name is reused", async () => {
+    const storage = new MemoryStorage();
+    const ids = ["model-random-1", "model-random-2", "color-random-1", "color-random-2"];
+    const repository = new DemoInventoryRepository(storage, { createId: () => ids.shift()! });
+
+    const firstModel = await repository.addModel("Runner");
+    await repository.renameModel(firstModel.id, "Runner Classic");
+    const reusedModel = await repository.addModel("Runner");
+    const firstColor = await repository.addColor("White");
+    await repository.renameColor(firstColor.id, "Ivory");
+    const reusedColor = await repository.addColor("White");
+
+    const reloaded = await new DemoInventoryRepository(storage).load();
+    expect(reusedModel.id).not.toBe(firstModel.id);
+    expect(reusedColor.id).not.toBe(firstColor.id);
+    expect(reloaded.models).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: firstModel.id, name: "Runner Classic" }),
+      expect.objectContaining({ id: reusedModel.id, name: "Runner" }),
+    ]));
+    expect(reloaded.colors).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: firstColor.id, name: "Ivory" }),
+      expect.objectContaining({ id: reusedColor.id, name: "White" }),
+    ]));
+  });
+
+  it("re-reads storage before mutations so stale repository instances do not overwrite each other", async () => {
+    const storage = new MemoryStorage();
+    const first = new DemoInventoryRepository(storage);
+    const second = new DemoInventoryRepository(storage);
+    await Promise.all([first.load(), second.load()]);
+
+    await first.addModel("Runner");
+    await second.addColor("White");
+
+    const reloaded = await new DemoInventoryRepository(storage).load();
+    expect(reloaded.models).toContainEqual(expect.objectContaining({ name: "Runner" }));
+    expect(reloaded.colors).toContainEqual(expect.objectContaining({ name: "White" }));
+  });
+
+  it("uses injected random identities for documents and lines", async () => {
+    const ids = ["document-random", "line-random"];
+    const repository = new DemoInventoryRepository(new MemoryStorage(), { createId: () => ids.shift()! });
+    const snapshot = await repository.load();
+    const variant = snapshot.variants[0];
+
+    const posted = await repository.postDocument({
+      type: "RECEIPT",
+      effectiveDate: "2026-07-22",
+      lines: [{ variantId: variant.id, size: variant.size, quantity: 1 }],
+    });
+
+    expect(posted.id).toBe("document-random");
+    expect(posted.lines[0].id).toBe("line-random");
+  });
+
+  it("serializes cross-repository mutations and advances a persisted snapshot revision", async () => {
+    const storage = new MemoryStorage();
+    const lockManager = new SerialLockManager();
+    const first = new DemoInventoryRepository(storage, { lockManager });
+    const second = new DemoInventoryRepository(storage, { lockManager });
+    await Promise.all([first.load(), second.load()]);
+
+    await Promise.all([first.addModel("Runner"), second.addColor("White")]);
+
+    const persisted = JSON.parse(storage.getItem(INVENTORY_STORAGE_KEY)!) as { revision?: number };
+    expect(lockManager.calls).toBe(2);
+    expect(lockManager.maxActive).toBe(1);
+    expect(persisted.revision).toBe(2);
+    expect((await first.load()).models).toContainEqual(expect.objectContaining({ name: "Runner" }));
+    expect((await second.load()).colors).toContainEqual(expect.objectContaining({ name: "White" }));
+  });
+
+  it("invalidates its cache and notifies subscribers when another tab changes storage", async () => {
+    const storage = new MemoryStorage();
+    const storageEvents = new EventTarget();
+    const reader = new DemoInventoryRepository(storage, { storageEventTarget: storageEvents });
+    const writer = new DemoInventoryRepository(storage);
+    await reader.load();
+    let notifications = 0;
+    const unsubscribe = reader.subscribe(() => { notifications += 1; });
+
+    await writer.addModel("Runner");
+    storageEvents.dispatchEvent(new StorageEvent("storage", {
+      key: INVENTORY_STORAGE_KEY,
+      newValue: storage.getItem(INVENTORY_STORAGE_KEY),
+    }));
+
+    expect(notifications).toBe(1);
+    expect((await reader.load()).models).toContainEqual(expect.objectContaining({ name: "Runner" }));
+
+    unsubscribe();
+    await writer.addColor("White");
+    storageEvents.dispatchEvent(new StorageEvent("storage", { key: INVENTORY_STORAGE_KEY }));
+    expect(notifications).toBe(1);
+  });
+
+  it("concurrently ensures one new variant tuple with an initialized zero balance", async () => {
+    const storage = new MemoryStorage();
+    const lockManager = new SerialLockManager();
+    const firstIds = ["model-runner", "color-white", "variant-runner-white-44"];
+    const first = new DemoInventoryRepository(storage, {
+      createId: () => firstIds.shift()!,
+      lockManager,
+    });
+    const second = new DemoInventoryRepository(storage, {
+      createId: () => "variant-duplicate",
+      lockManager,
+    });
+    const model = await first.addModel("Runner");
+    const color = await first.addColor("White");
+
+    const [created, concurrent] = await Promise.all([
+      first.ensureVariant(model.id, color.id, 44.5),
+      second.ensureVariant(model.id, color.id, 44.5),
+    ]);
+
+    const snapshot = await new DemoInventoryRepository(storage).load();
+    expect(concurrent.id).toBe(created.id);
+    expect(snapshot.variants.filter((variant) =>
+      variant.modelId === model.id && variant.colorId === color.id && variant.size === 44.5,
+    )).toEqual([created]);
+    expect(snapshot.balances[created.id]).toBe(0);
   });
 
   it("rejects catalog duplicates without case or surrounding-space sensitivity", async () => {

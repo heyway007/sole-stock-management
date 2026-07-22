@@ -52,6 +52,7 @@ describe("CatalogPage", () => {
     for (const model of ["Paris", "Castor", "Weave"]) expect(within(models).getByText(model)).toBeInTheDocument();
     for (const color of ["Black", "Navy", "Olive", "Brown", "Sand"]) expect(within(colors).getByText(color)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /ลบ/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "จัดการแค็ตตาล็อก" }).closest(".page-container")).not.toBeNull();
   });
 
   it("adds trimmed models and colors", async () => {

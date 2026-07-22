@@ -141,6 +141,10 @@ export interface InventoryDatabase {
         Args: never;
         Returns: Json;
       };
+      ensure_product_variant: {
+        Args: { p_model_id: string; p_color_id: string; p_size: number };
+        Returns: Json;
+      };
       post_stock_document: {
         Args: { command: Json };
         Returns: Json;

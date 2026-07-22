@@ -54,6 +54,10 @@ describe("ExchangePage", () => {
     await user.click(screen.getByRole("button", { name: "ตรวจสอบการเปลี่ยน" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("รายการแลกเปลี่ยนต้องมีทั้งรายการคืนและรายการทดแทน");
+    const replacement = screen.getByRole("region", { name: "สินค้าที่ส่งทดแทน" });
+    const replacementModel = within(replacement).getByRole("combobox", { name: "รุ่นสินค้า รายการ 1" });
+    expect(replacementModel).toHaveAttribute("aria-invalid", "true");
+    expect(replacementModel).toHaveAccessibleDescription("รายการแลกเปลี่ยนต้องมีทั้งรายการคืนและรายการทดแทน");
     expect(repository.inputs).toHaveLength(0);
   });
 
@@ -92,6 +96,10 @@ describe("ExchangePage", () => {
     await user.click(screen.getByRole("button", { name: "ตรวจสอบการเปลี่ยน" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("สินค้าทดแทนมีจำนวนไม่เพียงพอ");
+    const replacement = screen.getByRole("region", { name: "สินค้าที่ส่งทดแทน" });
+    const replacementQuantity = within(replacement).getByRole("spinbutton", { name: "จำนวน (คู่) รายการ 1" });
+    expect(replacementQuantity).toHaveAttribute("aria-invalid", "true");
+    expect(replacementQuantity).toHaveAccessibleDescription("สินค้าทดแทนมีจำนวนไม่เพียงพอ");
     expect(screen.queryByRole("dialog", { name: "ยืนยันการเปลี่ยนสินค้า" })).not.toBeInTheDocument();
     expect(repository.inputs).toHaveLength(0);
   });

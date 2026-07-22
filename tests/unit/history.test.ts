@@ -90,4 +90,9 @@ describe("selectHistory", () => {
     });
     expect(snapshot.documents).toEqual(before);
   });
+
+  it("filters documents by a linked line variant", () => {
+    const rows = selectHistory(snapshot, { ...allFilters, variantId: "castor-olive-42" });
+    expect(rows.map((row) => row.documentId)).toEqual(["doc-new", "doc-old"]);
+  });
 });

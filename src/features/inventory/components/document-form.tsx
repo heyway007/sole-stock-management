@@ -3,7 +3,11 @@
 import { useMemo, useState, type FormEvent, type PropsWithChildren, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
+import type { ValidationError } from "@/features/inventory/domain/types";
+import { DocumentValidationError } from "@/features/inventory/domain/validation";
 import { useUnsavedChanges } from "@/features/inventory/hooks/use-unsaved-changes";
+import { DocumentValidationContext, type DocumentValidationContextValue } from "./document-validation-context";
+import { RepositoryStatusBanner } from "./repository-status-banner";
 
 export interface DocumentMetadata {
   effectiveDate: string;
@@ -35,14 +39,23 @@ export function DocumentForm({ title, description, eyebrow, submitLabel, dirty, 
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
   const metadataDirty = effectiveDate !== initialDate || reference.trim() !== "" || note.trim() !== "";
   useUnsavedChanges(dirty || metadataDirty);
+
+  const validationContext = useMemo<DocumentValidationContextValue>(() => ({
+    errors: validationErrors,
+    errorFor: (path) => validationErrors.find((error) => error.path === path)?.message ?? null,
+    clearErrors: (paths) => setValidationErrors((current) => current.filter((error) => !paths.includes(error.path))),
+    clearAllErrors: () => setValidationErrors([]),
+  }), [validationErrors]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (submitting) return;
     setSubmitting(true);
     setFormError(null);
+    setValidationErrors([]);
     try {
       const result = await onSubmit({ effectiveDate, reference: reference.trim(), note: note.trim() });
       if (result !== false) {
@@ -51,7 +64,12 @@ export function DocumentForm({ title, description, eyebrow, submitLabel, dirty, 
         setNote("");
       }
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : "ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้ง");
+      if (error instanceof DocumentValidationError) {
+        setValidationErrors(error.errors);
+        setFormError(`กรุณาตรวจสอบข้อมูลในแบบฟอร์ม: ${error.message}`);
+      } else {
+        setFormError(error instanceof Error ? error.message : "ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้ง");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -62,9 +80,23 @@ export function DocumentForm({ title, description, eyebrow, submitLabel, dirty, 
       <header className="page-header">
         <div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1><p>{description}</p></div>
       </header>
+      <RepositoryStatusBanner />
+      <DocumentValidationContext.Provider value={validationContext}>
       <form className="document-form" onSubmit={(event) => void submit(event)}>
         <section className="document-card document-metadata" aria-label="ข้อมูลเอกสาร">
-          <Field label="วันที่มีผล" type="date" required value={effectiveDate} onChange={(event) => setEffectiveDate(event.target.value)} />
+          <Field
+            id="document-effective-date"
+            label="วันที่มีผล"
+            type="date"
+            required
+            value={effectiveDate}
+            error={validationContext.errorFor("effectiveDate")}
+            announceError={false}
+            onChange={(event) => {
+              setEffectiveDate(event.target.value);
+              validationContext.clearErrors(["effectiveDate"]);
+            }}
+          />
           <Field label="เลขอ้างอิง" value={reference} onChange={(event) => setReference(event.target.value)} />
           <label className="form-field document-note">
             <span className="form-field__label">หมายเหตุ</span>
@@ -76,6 +108,7 @@ export function DocumentForm({ title, description, eyebrow, submitLabel, dirty, 
         {formError && <div className="form-error-banner" role="alert">{formError}</div>}
         <footer className="document-actions"><Button type="submit" disabled={submitting}>{submitting ? "กำลังบันทึก…" : submitLabel}</Button></footer>
       </form>
+      </DocumentValidationContext.Provider>
     </div>
   );
 }

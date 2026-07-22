@@ -54,6 +54,24 @@ describe("postDocument", () => {
     expect(result.balances[replacement.id]).toBe(seed.balances[replacement.id] - 1);
   });
 
+  it("validates an exchange after aggregating reversed lines for the same variant", () => {
+    const seed = createSeedSnapshot();
+    const variant = seed.variants[0];
+    seed.balances[variant.id] = 0;
+
+    const result = postDocument(seed, {
+      type: "EXCHANGE",
+      effectiveDate: "2026-07-22",
+      lines: [
+        { variantId: variant.id, size: variant.size, quantity: 1, section: "REPLACEMENT" },
+        { variantId: variant.id, size: variant.size, quantity: 1, section: "RETURNED" },
+      ],
+    }, ids);
+
+    expect(result.balances[variant.id]).toBe(0);
+    expect(result.documents.at(-1)?.lines.map((line) => line.delta)).toEqual([-1, 1]);
+  });
+
   it("requires an explicit direction for an adjustment", () => {
     const seed = createSeedSnapshot();
     const variant = seed.variants[0];

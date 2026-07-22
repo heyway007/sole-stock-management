@@ -48,7 +48,10 @@ describe("IssuePage", () => {
     expect(screen.getByText("คงเหลือ 2 คู่")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "บันทึกการนำออก" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("กรุณาเลือกเหตุผลการนำออก");
+    expect(await screen.findByRole("alert")).toHaveTextContent("กรุณาตรวจสอบข้อมูลในแบบฟอร์ม");
+    const reason = screen.getByRole("combobox", { name: "เหตุผลการนำออก" });
+    expect(reason).toHaveAttribute("aria-invalid", "true");
+    expect(reason).toHaveAccessibleDescription("กรุณาเลือกเหตุผลการนำออก");
     expect(repository.inputs).toHaveLength(0);
   });
 
@@ -99,6 +102,9 @@ describe("IssuePage", () => {
     await user.click(screen.getByRole("button", { name: "บันทึกการนำออก" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("จำนวนที่นำออกเกินสต็อกคงเหลือ");
+    const quantity = screen.getByRole("spinbutton", { name: "จำนวน (คู่) รายการ 1" });
+    expect(quantity).toHaveAttribute("aria-invalid", "true");
+    expect(quantity).toHaveAccessibleDescription("จำนวนที่นำออกเกินสต็อกคงเหลือ");
     expect(repository.inputs).toHaveLength(0);
   });
 

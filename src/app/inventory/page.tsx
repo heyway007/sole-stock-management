@@ -9,9 +9,10 @@ import { Field } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { Toast } from "@/components/ui/toast";
+import { RepositoryStatusBanner } from "@/features/inventory/components/repository-status-banner";
 import { StockStatus } from "@/features/inventory/components/stock-status";
 import { filterInventory, type InventoryFilters, type InventoryRow } from "@/features/inventory/domain/selectors";
-import { InventoryProvider, useInventory } from "@/features/inventory/inventory-provider";
+import { useInventory } from "@/features/inventory/inventory-provider";
 
 const initialFilters: InventoryFilters = { query: "", modelId: null, colorId: null, status: "ALL" };
 const thresholdError = "กรุณากรอกจำนวนเต็มตั้งแต่ 0 ขึ้นไป";
@@ -72,10 +73,9 @@ export function InventoryPageContent() {
     }
   }
 
-  if (loading) return <div className="page-state" role="status">กำลังโหลดข้อมูลสต็อก…</div>;
+  if (loading && !snapshot) return <div className="page-state" role="status">กำลังโหลดข้อมูลสต็อก…</div>;
   if (repositoryError && !snapshot) return <div className="page-state page-state--error" role="alert">{repositoryError}</div>;
   if (!snapshot) return <div className="page-state" role="status">ยังไม่มีข้อมูลสต็อก</div>;
-  if (repositoryError && !editingRow) return <div className="page-state page-state--error" role="alert">{repositoryError}</div>;
 
   return (
     <div className="page-container inventory-page">
@@ -87,6 +87,8 @@ export function InventoryPageContent() {
         </div>
         <span className="inventory-count"><strong>{rows.length}</strong><small>รายการ</small></span>
       </header>
+
+      <RepositoryStatusBanner />
 
       <section className="filter-panel" aria-label="ค้นหาและกรองสินค้า">
         <Field
@@ -185,5 +187,5 @@ export function InventoryPageContent() {
 }
 
 export default function InventoryPage() {
-  return <InventoryProvider><InventoryPageContent /></InventoryProvider>;
+  return <InventoryPageContent />;
 }

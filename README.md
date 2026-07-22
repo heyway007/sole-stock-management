@@ -20,7 +20,7 @@ npm run dev
 
 ## Demo persistence and reset
 
-โหมด `demo` เก็บ snapshot ทั้งหมดไว้ใน `localStorage` ของ browser ภายใต้ key `sole-stock.inventory.v1` ข้อมูลรับเข้า นำออก แลกเปลี่ยน เกณฑ์สต็อกต่ำ และการแก้ไขแค็ตตาล็อกจึงยังอยู่หลัง refresh แต่แยกกันตาม browser และ origin และไม่ได้ sync ระหว่างเครื่อง
+โหมด `demo` เก็บ snapshot ทั้งหมดไว้ใน `localStorage` ของ browser ภายใต้ key `sole-stock.inventory.v1` ข้อมูลรับเข้า นำออก แลกเปลี่ยน เกณฑ์สต็อกต่ำ และการแก้ไขแค็ตตาล็อกจึงยังอยู่หลัง refresh แต่แยกกันตาม browser และ origin และไม่ได้ sync ระหว่างเครื่อง แท็บที่เปิด origin เดียวกันจะรับการเปลี่ยนแปลงผ่าน storage event โดยอัตโนมัติ และ mutation จะใช้ Web Locks (เมื่อ browser รองรับ) พร้อม revision check เพื่อไม่ให้แท็บหนึ่งเขียนทับข้อมูลใหม่จากอีกแท็บ
 
 เมื่อต้องการกลับไปใช้ข้อมูลตั้งต้น ให้เปิด DevTools แล้วลบ key `sole-stock.inventory.v1` จาก Local Storage (หรือ clear site data) จากนั้น reload หน้าเว็บ แอปจะสร้าง seeded inventory ใหม่โดยอัตโนมัติ การ reset นี้ลบเอกสารสาธิตทั้งหมดใน browser นั้น
 
@@ -35,7 +35,7 @@ Copy-Item .env.example .env.local
 ## Supabase setup and switching
 
 1. สร้าง Supabase project สำหรับข้อมูลที่ไม่อ่อนไหว
-2. Apply migration [`supabase/migrations/202607220001_inventory.sql`](supabase/migrations/202607220001_inventory.sql) ผ่าน SQL Editor ของ Supabase หรือ link project แล้วรัน:
+2. Apply migration ใน [`supabase/migrations`](supabase/migrations) ตามลำดับชื่อไฟล์ (รวม forward migration `202607220002_variant_and_retry_reconciliation.sql`) ผ่าน SQL Editor ของ Supabase หรือ link project แล้วรัน:
 
    ```powershell
    npx supabase link --project-ref <project-ref>
@@ -52,13 +52,19 @@ Copy-Item .env.example .env.local
 
 Repository factory จะเลือก Supabase เฉพาะเมื่อ backend flag, URL และ anonymous key ครบทั้งสามค่า หากค่าใดหายไป แอปจะ fallback เป็น demo repository เพื่อคงค่าเริ่มต้นที่ปลอดภัยและเปิดใช้งานได้โดยไม่ต้องตั้งค่า
 
+### Creating the first size variant
+
+เพิ่มรุ่นและสีที่หน้า `/catalog` ก่อน จากนั้นไปที่ `/receive` เลือกรุ่นและสี เลือก `เพิ่มไซซ์ใหม่` ในช่องไซซ์ แล้วกรอกไซซ์ทศนิยมหนึ่งตำแหน่งและจำนวนรับเข้า การบันทึกจะสร้าง model-color-size variant ที่ยังไม่มีด้วยยอดตั้งต้น 0 แล้วรับสินค้าใน workflow เดียวกัน หาก variant เดิมมีอยู่แล้ว ระบบจะนำกลับมาใช้แทนการสร้างซ้ำ
+
+ในโหมด Supabase การสร้าง variant ทำผ่าน `ensure_product_variant` RPC แบบ atomic และ idempotent ภายใต้ unique model-color-size constraint ส่วน browser roles ยังคงไม่มีสิทธิ์ insert ตาราง `product_variants` โดยตรง
+
 ### Security limitation
 
 Version one deliberately has no authentication, login, application roles, or user access restrictions. Anonymous and authenticated Supabase sessions receive the same open read/catalog access, so this setup is suitable only for non-sensitive, single-tenant/shared-workspace use. Do not publish it for sensitive or multi-tenant data without adding authentication and authorization.
 
-Ledger tables are not directly writable by browser roles. Stock documents are posted through the open `post_stock_document` RPC, whose carefully owned `SECURITY DEFINER` function is only a database-integrity boundary: it validates and locks balances, prevents duplicate retries, and commits the document atomically. It does not identify or authorize users. Snapshot loading uses the open `get_inventory_snapshot` RPC so every catalog, balance, document, and line comes from one coherent uncapped PostgreSQL snapshot.
+Ledger and variant tables are not directly writable by browser roles. Stock documents are posted through the open `post_stock_document` RPC, whose carefully owned `SECURITY DEFINER` function is only a database-integrity boundary: it validates and locks balances, prevents duplicate retries, and commits the document atomically. Variant creation uses the separately scoped `ensure_product_variant` RPC. Neither function identifies or authorizes users. Snapshot loading uses the open `get_inventory_snapshot` RPC so every catalog, balance, document, and line comes from one coherent uncapped PostgreSQL snapshot.
 
-Posting retry identity is retained only within the current repository instance. If the browser fully reloads after an ambiguous network response, reload and reconcile against movement history before submitting again; a blind retry after reload receives a new request UUID.
+Supabase posting stores each pending payload fingerprint and request UUID as an isolated browser `localStorage` entry under the `sole-stock.supabase.pending-posts.v1` prefix, namespaced by Supabase URL. A Web Lock serializes cross-tab identity allocation. An ambiguous retry therefore reuses the same UUID even after repository reconstruction or a full reload, allowing `post_stock_document` to reconcile idempotently. The pending entry is removed after a confirmed response or after a coherent snapshot proves that the UUID already committed; an identical later business command then receives a fresh UUID. Clearing site data removes unresolved retry identities, so reconcile movement history before retrying any request that was in flight when storage was cleared.
 
 ## Test and verification commands
 

@@ -1,10 +1,18 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { HistoryPageContent } from "@/app/history/page";
 import { DemoInventoryRepository, INVENTORY_STORAGE_KEY } from "@/features/inventory/data/demo-repository";
 import type { InventorySnapshot, MovementType } from "@/features/inventory/domain/types";
 import { InventoryProvider } from "@/features/inventory/inventory-provider";
+
+const { replaceRoute } = vi.hoisted(() => ({ replaceRoute: vi.fn() }));
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/history",
+  useRouter: () => ({ replace: replaceRoute }),
+  useSearchParams: () => new URLSearchParams(window.location.search),
+}));
 
 class MemoryStorage implements Storage {
   private readonly values = new Map<string, string>();
@@ -68,7 +76,11 @@ function renderHistory() {
 }
 
 describe("HistoryPage", () => {
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    replaceRoute.mockReset();
+    window.history.replaceState({}, "", "/");
+  });
 
   it("renders Thai movement labels and filters by type, inclusive date range, and joined search", async () => {
     const user = userEvent.setup();
@@ -121,5 +133,31 @@ describe("HistoryPage", () => {
     expect(within(dialog).getByText("ลูกค้าเปลี่ยนไซซ์")).toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: /แก้ไข|ลบ/ })).not.toBeInTheDocument();
     expect((await repository.load()).documents).toEqual(snapshot.documents);
+  });
+
+  it("applies a variant deep link and exposes a removable Thai filter label", async () => {
+    const user = userEvent.setup();
+    window.history.replaceState({}, "", "/history?variant=castor-olive-42");
+    renderHistory();
+    const table = await screen.findByRole("table", { name: "ประวัติการเคลื่อนไหวสต็อก" });
+
+    expect(within(table).getAllByRole("row")).toHaveLength(2);
+    expect(within(table).getByText("EX-500")).toBeInTheDocument();
+    expect(screen.getByText("กรองสินค้า: Castor / Olive / 42")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "ยกเลิกตัวกรองสินค้า" }));
+    expect(within(table).getAllByRole("row")).toHaveLength(6);
+    expect(screen.queryByText("กรองสินค้า: Castor / Olive / 42")).not.toBeInTheDocument();
+    expect(replaceRoute).toHaveBeenCalledWith("/history", { scroll: false });
+  });
+
+  it("renders populated mobile history cards and uses the shared responsive page container", async () => {
+    renderHistory();
+    const cards = await screen.findByRole("list", { name: "ประวัติการเคลื่อนไหวแบบการ์ด" });
+
+    expect(within(cards).getAllByRole("listitem")).toHaveLength(5);
+    expect(within(cards).getByText("EX-500")).toBeInTheDocument();
+    expect(within(cards).getByRole("button", { name: "ดูรายละเอียด STK-20260705-0005 แบบการ์ด" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "ประวัติการเคลื่อนไหว" }).closest(".page-container")).not.toBeNull();
   });
 });

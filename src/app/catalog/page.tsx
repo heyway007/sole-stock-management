@@ -7,8 +7,9 @@ import { Field } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Toast } from "@/components/ui/toast";
+import { RepositoryStatusBanner } from "@/features/inventory/components/repository-status-banner";
 import type { Color, ShoeModel } from "@/features/inventory/domain/types";
-import { InventoryProvider, useInventory } from "@/features/inventory/inventory-provider";
+import { useInventory } from "@/features/inventory/inventory-provider";
 
 type CatalogKind = "model" | "color";
 type CatalogItem = { kind: CatalogKind; id: string; name: string };
@@ -130,10 +131,12 @@ export function CatalogPageContent() {
   }
 
   return (
-    <div className="page catalog-page">
+    <div className="page-container catalog-page">
       <header className="page-header">
         <div><p className="eyebrow">แค็ตตาล็อกสินค้า</p><h1>จัดการแค็ตตาล็อก</h1><p>เพิ่ม เปลี่ยนชื่อ และกำหนดสถานะรุ่นรองเท้ากับสี</p></div>
       </header>
+
+      <RepositoryStatusBanner />
 
       <div className="catalog-grid">
         <section className="catalog-card" aria-label="จัดการรุ่นรองเท้า">
@@ -195,5 +198,5 @@ export function CatalogPageContent() {
 }
 
 export default function CatalogPage() {
-  return <InventoryProvider><CatalogPageContent /></InventoryProvider>;
+  return <CatalogPageContent />;
 }

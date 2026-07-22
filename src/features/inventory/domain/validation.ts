@@ -22,6 +22,16 @@ type ValidationResult =
   | { success: true; data: StockDocumentInput }
   | { success: false; errors: ValidationError[] };
 
+export class DocumentValidationError extends Error {
+  readonly errors: ValidationError[];
+
+  constructor(errors: ValidationError[]) {
+    super(errors[0]?.message ?? "กรุณาตรวจสอบข้อมูลในแบบฟอร์ม");
+    this.name = "DocumentValidationError";
+    this.errors = errors;
+  }
+}
+
 const thaiMessages = {
   required: "กรุณากรอกข้อมูลให้ครบถ้วน",
   invalidSize: "ขนาดรองเท้าต้องมากกว่า 0",

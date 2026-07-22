@@ -30,4 +30,20 @@ describe("Supabase inventory migration ACL", () => {
     expect(migration).not.toMatch(/grant\s+(?:insert|update)\s*\([^)]*(?:model_id|color_id|size|active)[^)]*\)\s+on\s+public\.product_variants/);
     expect(migration).not.toMatch(/grant\s+insert\s*\([^)]*\)\s+on\s+public\.product_variants/);
   });
+
+  it("ships variant creation and retry reconciliation as a forward migration", () => {
+    const upgradeMigration = readFileSync(
+      resolve(process.cwd(), "supabase/migrations/202607220002_variant_and_retry_reconciliation.sql"),
+      "utf8",
+    ).replaceAll("\r\n", "\n").toLocaleLowerCase("en-US");
+
+    expect(migration).not.toContain("create or replace function public.ensure_product_variant(");
+    expect(upgradeMigration).toContain("create or replace function public.ensure_product_variant(");
+    expect(upgradeMigration).toMatch(/insert into public\.product_variants[\s\S]*?on conflict \(model_id, color_id, size\)[\s\S]*?do update/);
+    expect(upgradeMigration).toContain("insert into public.inventory_balances");
+    expect(upgradeMigration).toContain("'client_request_id', document.client_request_id");
+    expect(upgradeMigration).toContain("alter function public.ensure_product_variant(uuid, uuid, numeric) owner to postgres;");
+    expect(upgradeMigration).toContain("revoke all on function public.ensure_product_variant(uuid, uuid, numeric) from public, anon, authenticated;");
+    expect(upgradeMigration).toContain("grant execute on function public.ensure_product_variant(uuid, uuid, numeric) to anon, authenticated;");
+  });
 });

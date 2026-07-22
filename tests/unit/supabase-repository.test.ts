@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SupabaseInventoryRepository } from "@/features/inventory/data/supabase-repository";
+import { PENDING_POSTS_STORAGE_KEY, SupabaseInventoryRepository } from "@/features/inventory/data/supabase-repository";
 import type { StockDocument, StockDocumentInput } from "@/features/inventory/domain/types";
 import type { InventorySupabaseClient, Json } from "@/lib/supabase";
 
@@ -27,6 +27,27 @@ interface TableChain {
   select(columns: string): TableChain;
   eq(column: string, value: unknown): TableChain;
   single(): Promise<ClientResult>;
+}
+
+class MemoryStorage implements Storage {
+  private readonly values = new Map<string, string>();
+  get length() { return this.values.size; }
+  clear() { this.values.clear(); }
+  getItem(key: string) { return this.values.get(key) ?? null; }
+  key(index: number) { return [...this.values.keys()][index] ?? null; }
+  removeItem(key: string) { this.values.delete(key); }
+  setItem(key: string, value: string) { this.values.set(key, value); }
+
+  entries() { return [...this.values.entries()]; }
+}
+
+class RecordingLockManager {
+  readonly names: string[] = [];
+
+  async request<T>(name: string, callback: () => Promise<T> | T): Promise<T> {
+    this.names.push(name);
+    return callback();
+  }
 }
 
 class ContractClient {
@@ -99,6 +120,40 @@ function document(id: string, number: string): StockDocument {
   };
 }
 
+function snapshotPayload() {
+  return {
+    models: [{ id: "model-1", name: "Paris", active: true }],
+    colors: [{ id: "color-1", name: "Black", active: true }],
+    variants: [{
+      id: "variant-1",
+      model_id: "model-1",
+      color_id: "color-1",
+      size: "38.5",
+      low_stock_threshold: 3,
+      active: true,
+    }],
+    balances: [{ variant_id: "variant-1", quantity: 7 }],
+    documents: [{
+      id: "document-1",
+      client_request_id: "00000000-0000-4000-8000-000000000099",
+      document_number: "STK-20260722-000001",
+      movement_type: "RECEIPT",
+      effective_date: "2026-07-22",
+      reference: "PO-1",
+      note: "",
+      created_at: "2026-07-22T09:00:00.000Z",
+    }],
+    lines: [{
+      id: "line-1",
+      document_id: "document-1",
+      variant_id: "variant-1",
+      delta: 2,
+      exchange_section: null as "RETURNED" | "REPLACEMENT" | null,
+      note: null,
+    }],
+  };
+}
+
 describe("SupabaseInventoryRepository client contract", () => {
   it("loads one coherent snapshot RPC payload with multiple documents and ordered lines", async () => {
     const client = new ContractClient();
@@ -118,6 +173,7 @@ describe("SupabaseInventoryRepository client contract", () => {
         documents: [
           {
             id: "document-1",
+            client_request_id: "00000000-0000-4000-8000-000000000098",
             document_number: "STK-20260722-000001",
             movement_type: "RECEIPT",
             effective_date: "2026-07-22",
@@ -127,6 +183,7 @@ describe("SupabaseInventoryRepository client contract", () => {
           },
           {
             id: "document-2",
+            client_request_id: "00000000-0000-4000-8000-000000000099",
             document_number: "STK-20260722-000002",
             movement_type: "EXCHANGE",
             effective_date: "2026-07-22",
@@ -150,6 +207,28 @@ describe("SupabaseInventoryRepository client contract", () => {
     expect(client.rpcCalls).toEqual([{ name: "get_inventory_snapshot", args: undefined }]);
     expect(snapshot.documents).toHaveLength(2);
     expect(snapshot.documents[1].lines.map((line) => line.id)).toEqual(["line-2", "line-3"]);
+  });
+
+  it.each([
+    ["movement type", (payload: ReturnType<typeof snapshotPayload>) => { payload.documents[0].movement_type = "UNKNOWN"; }],
+    ["variant number", (payload: ReturnType<typeof snapshotPayload>) => { payload.variants[0].size = "not-a-number"; }],
+    ["balance number", (payload: ReturnType<typeof snapshotPayload>) => { payload.balances[0].quantity = -1; }],
+    ["identifier", (payload: ReturnType<typeof snapshotPayload>) => { payload.models[0].id = ""; }],
+    ["client request identifier", (payload: ReturnType<typeof snapshotPayload>) => { payload.documents[0].client_request_id = ""; }],
+    ["line delta", (payload: ReturnType<typeof snapshotPayload>) => { payload.lines[0].delta = 0; }],
+    ["line reference", (payload: ReturnType<typeof snapshotPayload>) => { payload.lines[0].document_id = "missing-document"; }],
+    ["exchange sections", (payload: ReturnType<typeof snapshotPayload>) => {
+      payload.documents[0].movement_type = "EXCHANGE";
+      payload.lines[0].exchange_section = "RETURNED";
+    }],
+  ])("rejects a malformed nested snapshot %s before mapping", async (_label, mutate) => {
+    const client = new ContractClient();
+    const payload = snapshotPayload();
+    mutate(payload);
+    client.rpcResults.push({ data: payload as unknown as Json, error: null });
+    const repository = new SupabaseInventoryRepository("https://example.supabase.co", "anon", asClient(client));
+
+    await expect(repository.load()).rejects.toThrow("ไม่สามารถบันทึกข้อมูลได้");
   });
 
   it("reuses a request UUID after failure and allocates a new UUID after confirmed success", async () => {
@@ -185,6 +264,136 @@ describe("SupabaseInventoryRepository client contract", () => {
       "00000000-0000-4000-8000-000000000001",
       "00000000-0000-4000-8000-000000000002",
     ]);
+  });
+
+  it("reuses a persisted request UUID after repository reconstruction and clears it on confirmation", async () => {
+    const storage = new MemoryStorage();
+    const failedClient = new ContractClient();
+    failedClient.rpcResults.push({
+      data: null,
+      error: { code: "503", message: "network unavailable", details: "", hint: "" },
+    });
+    const first = new SupabaseInventoryRepository(
+      "https://example.supabase.co",
+      "anon",
+      asClient(failedClient),
+      () => "00000000-0000-4000-8000-000000000011",
+      storage,
+    );
+    await expect(first.postDocument(input)).rejects.toThrow(/ไม่สามารถบันทึก/);
+    expect(storage.getItem(PENDING_POSTS_STORAGE_KEY)).toBeNull();
+    expect(storage.entries()).toEqual([
+      [expect.stringMatching(new RegExp(`^${PENDING_POSTS_STORAGE_KEY}:`)), "00000000-0000-4000-8000-000000000011"],
+    ]);
+
+    const confirmedClient = new ContractClient();
+    confirmedClient.rpcResults.push({
+      data: document("document-1", "STK-20260722-000001") as unknown as Json,
+      error: null,
+    });
+    const reconstructed = new SupabaseInventoryRepository(
+      "https://example.supabase.co",
+      "anon",
+      asClient(confirmedClient),
+      () => "00000000-0000-4000-8000-000000000022",
+      storage,
+    );
+
+    await expect(reconstructed.postDocument(input)).resolves.toMatchObject({ id: "document-1" });
+    const firstCommand = failedClient.rpcCalls[0].args?.command as Record<string, Json>;
+    const retriedCommand = confirmedClient.rpcCalls[0].args?.command as Record<string, Json>;
+    expect(retriedCommand.requestId).toBe(firstCommand.requestId);
+    expect(storage.entries()).toEqual([]);
+  });
+
+  it("reconciles a committed request after a lost response before an identical later command", async () => {
+    const storage = new MemoryStorage();
+    const lockManager = new RecordingLockManager();
+    const committedRequestId = "00000000-0000-4000-8000-000000000031";
+    const nextRequestId = "00000000-0000-4000-8000-000000000032";
+    const failedClient = new ContractClient();
+    failedClient.rpcResults.push({
+      data: null,
+      error: { code: "503", message: "response lost after commit", details: "", hint: "" },
+    });
+    const first = new SupabaseInventoryRepository(
+      "https://example.supabase.co",
+      "anon",
+      asClient(failedClient),
+      () => committedRequestId,
+      storage,
+      lockManager,
+    );
+
+    await expect(first.postDocument(input)).rejects.toThrow();
+
+    const reconciledClient = new ContractClient();
+    const committedSnapshot = snapshotPayload();
+    committedSnapshot.documents[0].client_request_id = committedRequestId;
+    reconciledClient.rpcResults.push(
+      { data: committedSnapshot as unknown as Json, error: null },
+      { data: document("document-2", "STK-20260722-000002") as unknown as Json, error: null },
+    );
+    const reconstructed = new SupabaseInventoryRepository(
+      "https://example.supabase.co",
+      "anon",
+      asClient(reconciledClient),
+      () => nextRequestId,
+      storage,
+      lockManager,
+    );
+
+    await reconstructed.load();
+    expect(storage.entries()).toEqual([]);
+    await expect(reconstructed.postDocument(input)).resolves.toMatchObject({ id: "document-2" });
+
+    const laterCommand = reconciledClient.rpcCalls[1].args?.command as Record<string, Json>;
+    expect(laterCommand.requestId).toBe(nextRequestId);
+    expect(laterCommand.requestId).not.toBe(committedRequestId);
+    expect(lockManager.names.length).toBeGreaterThanOrEqual(3);
+    expect(new Set(lockManager.names)).toEqual(new Set([PENDING_POSTS_STORAGE_KEY]));
+  });
+
+  it("ensures a variant through the concurrency-safe RPC without a direct table insert", async () => {
+    const client = new ContractClient();
+    client.rpcResults.push({
+      data: {
+        id: "variant-2",
+        modelId: "model-1",
+        colorId: "color-1",
+        size: 44.5,
+        lowStockThreshold: 3,
+        active: true,
+      },
+      error: null,
+    });
+    const repository = new SupabaseInventoryRepository("https://example.supabase.co", "anon", asClient(client));
+
+    await expect(repository.ensureVariant("model-1", "color-1", 44.5)).resolves.toEqual({
+      id: "variant-2",
+      modelId: "model-1",
+      colorId: "color-1",
+      size: 44.5,
+      lowStockThreshold: 3,
+      active: true,
+    });
+    expect(client.rpcCalls).toEqual([{
+      name: "ensure_product_variant",
+      args: { p_model_id: "model-1", p_color_id: "color-1", p_size: 44.5 },
+    }]);
+    expect(client.tableCalls).toHaveLength(0);
+  });
+
+  it.each([
+    ["empty identity", { id: "", modelId: "model-1", colorId: "color-1", size: 44.5, lowStockThreshold: 3, active: true }],
+    ["empty model", { id: "variant-2", modelId: "", colorId: "color-1", size: 44.5, lowStockThreshold: 3, active: true }],
+    ["unsupported precision", { id: "variant-2", modelId: "model-1", colorId: "color-1", size: 44.55, lowStockThreshold: 3, active: true }],
+  ])("rejects a malformed ensured variant response with %s", async (_label, payload) => {
+    const client = new ContractClient();
+    client.rpcResults.push({ data: payload as unknown as Json, error: null });
+    const repository = new SupabaseInventoryRepository("https://example.supabase.co", "anon", asClient(client));
+
+    await expect(repository.ensureVariant("model-1", "color-1", 44.5)).rejects.toThrow();
   });
 
   it("uses the open model table contract for a trimmed catalog insert", async () => {

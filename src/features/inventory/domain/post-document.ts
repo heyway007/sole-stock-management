@@ -29,14 +29,13 @@ export function postDocument(
   }
 
   const balances = { ...snapshot.balances };
+  const deltasByVariant = new Map<string, number>();
   const lines: StockDocumentLine[] = validated.data.lines.map((line, index) => {
     const variant = snapshot.variants.find((candidate) => candidate.id === line.variantId);
     if (!variant || variant.size !== line.size) throw new Error("VARIANT_NOT_FOUND");
 
     const delta = deltaFor(validated.data.type, line);
-    const projectedBalance = (balances[line.variantId] ?? 0) + delta;
-    if (projectedBalance < 0) throw new Error("INSUFFICIENT_STOCK");
-    balances[line.variantId] = projectedBalance;
+    deltasByVariant.set(line.variantId, (deltasByVariant.get(line.variantId) ?? 0) + delta);
 
     return Object.freeze({
       id: ids.lineId(index),
@@ -46,6 +45,11 @@ export function postDocument(
       ...(line.note ? { note: line.note } : {}),
     });
   });
+  for (const [variantId, delta] of deltasByVariant) {
+    const projectedBalance = (balances[variantId] ?? 0) + delta;
+    if (projectedBalance < 0) throw new Error("INSUFFICIENT_STOCK");
+    balances[variantId] = projectedBalance;
+  }
   const document: StockDocument = {
     id: ids.documentId(),
     number: ids.documentNumber(),

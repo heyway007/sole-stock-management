@@ -92,6 +92,17 @@ test("demo inventory workflow stays accurate on desktop and routes stay usable o
     await expect(stockSummary.getByText("773", { exact: true })).toBeVisible();
     await expect(stockSummary.getByText("9", { exact: true })).toBeVisible();
 
+    await mainNavigation.getByRole("link", { name: "จัดการสินค้า" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "จัดการแค็ตตาล็อก" })).toBeVisible();
+    const models = page.getByRole("region", { name: "จัดการรุ่นรองเท้า" });
+    const colors = page.getByRole("region", { name: "จัดการสี" });
+    await models.getByLabel("ชื่อรุ่นใหม่").fill("E2E Runner");
+    await models.getByRole("button", { name: "เพิ่มรุ่น" }).click();
+    await expect(models.getByText("E2E Runner", { exact: true })).toBeVisible();
+    await colors.getByLabel("ชื่อสีใหม่").fill("E2E White");
+    await colors.getByRole("button", { name: "เพิ่มสี" }).click();
+    await expect(colors.getByText("E2E White", { exact: true })).toBeVisible();
+
     await mainNavigation.getByRole("link", { name: "รับสินค้า" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "รับสินค้า" })).toBeVisible();
     const receiveEditor = page.getByRole("region", { name: "รายการสินค้า" });
@@ -99,6 +110,12 @@ test("demo inventory workflow stays accurate on desktop and routes stay usable o
     await chooseVariant(receiveEditor, 1, { model: "Paris", color: "Black", size: "38", quantity: "3" });
     await receiveEditor.getByRole("button", { name: "เพิ่มรายการ" }).click();
     await chooseVariant(receiveEditor, 2, { model: "Paris", color: "Black", size: "38.5", quantity: "4" });
+    await receiveEditor.getByRole("button", { name: "เพิ่มรายการ" }).click();
+    await receiveEditor.getByLabel("รุ่นสินค้า รายการ 3").selectOption({ label: "E2E Runner" });
+    await receiveEditor.getByLabel("สีสินค้า รายการ 3").selectOption({ label: "E2E White" });
+    await receiveEditor.getByLabel("ไซซ์ รายการ 3").selectOption("__new__");
+    await receiveEditor.getByLabel("ไซซ์ใหม่ รายการ 3").fill("44.5");
+    await receiveEditor.getByLabel("จำนวน (คู่) รายการ 3").fill("2");
     await page.getByRole("button", { name: "บันทึกรับสินค้า" }).click();
     await expect(page.getByRole("status", { name: "บันทึกสำเร็จ" })).toContainText("รับสินค้าเรียบร้อย");
 
@@ -135,7 +152,7 @@ test("demo inventory workflow stays accurate on desktop and routes stay usable o
     await expect(history).toContainText("E2E-RECEIVE");
     await expect(history).toContainText("E2E-SALE");
     await expect(history).toContainText("E2E-EXCHANGE");
-    await expect(history.getByRole("row").filter({ hasText: "E2E-RECEIVE" })).toContainText("+7 คู่");
+    await expect(history.getByRole("row").filter({ hasText: "E2E-RECEIVE" })).toContainText("+9 คู่");
     await expect(history.getByRole("row").filter({ hasText: "E2E-SALE" })).toContainText("-1 คู่");
     await expect(history.getByRole("row").filter({ hasText: "E2E-EXCHANGE" })).toContainText("0 คู่");
 
@@ -148,6 +165,9 @@ test("demo inventory workflow stays accurate on desktop and routes stay usable o
       .filter({ has: page.getByRole("cell", { name: "38.5", exact: true }) });
     await expect(size38.getByRole("cell", { name: "5 คู่", exact: true })).toBeVisible();
     await expect(size385.getByRole("cell", { name: "12 คู่", exact: true })).toBeVisible();
+    const newVariant = inventory.getByRole("row").filter({ hasText: "E2E Runner" }).filter({ hasText: "E2E White" });
+    await expect(newVariant.getByRole("cell", { name: "44.5", exact: true })).toBeVisible();
+    await expect(newVariant.getByRole("cell", { name: "2 คู่", exact: true })).toBeVisible();
     return;
   }
 
@@ -155,6 +175,21 @@ test("demo inventory workflow stays accurate on desktop and routes stay usable o
   const mobileNavigation = page.getByRole("navigation", { name: "เมนูมือถือ" });
   await expect(desktopNavigation).toBeHidden();
   await expect(mobileNavigation).toBeVisible();
+
+  const receiveLink = mobileNavigation.getByRole("link", { name: "รับสินค้า", exact: true });
+  await receiveLink.scrollIntoViewIfNeeded();
+  await receiveLink.click();
+  await expect(page.getByRole("heading", { level: 1, name: "รับสินค้า" })).toBeVisible();
+  const mobileReceiveEditor = page.getByRole("region", { name: "รายการสินค้า" });
+  await page.getByLabel("เลขอ้างอิง").fill("E2E-MOBILE");
+  await chooseVariant(mobileReceiveEditor, 1, { model: "Paris", color: "Black", size: "38", quantity: "1" });
+  await page.getByRole("button", { name: "บันทึกรับสินค้า" }).click();
+  await expect(page.getByRole("status", { name: "บันทึกสำเร็จ" })).toContainText("รับสินค้าเรียบร้อย");
+  // The Next.js development toolbar occupies the bottom-left corner where the
+  // dashboard tab lives. A real navigation keeps the demo repository storage
+  // intact without making this assertion depend on that development-only UI.
+  await page.goto("/");
+  await expect(page.getByRole("heading", { level: 1, name: "ภาพรวมสต็อก" })).toBeVisible();
 
   const navigationChecks = [
     { name: "ภาพรวม", heading: "ภาพรวมสต็อก", primary: page.getByRole("main").getByRole("link", { name: "รับสินค้า" }).first() },
@@ -176,6 +211,16 @@ test("demo inventory workflow stays accurate on desktop and routes stay usable o
       await link.click();
     }
     await expect(page.getByRole("heading", { level: 1, name: check.heading })).toBeVisible();
+    if (check.name === "ประวัติ") {
+      const cards = page.getByRole("list", { name: "ประวัติการเคลื่อนไหวแบบการ์ด" });
+      await expect(cards).toBeVisible();
+      await expect(cards.getByRole("listitem")).toHaveCount(1);
+      await expect(cards).toContainText("E2E-MOBILE");
+      await expect(page.getByRole("table", { name: "ประวัติการเคลื่อนไหวสต็อก" })).toBeHidden();
+      await cards.getByRole("button", { name: /แบบการ์ด/ }).click();
+      await expect(page.getByRole("dialog", { name: /รายละเอียดเอกสาร/ })).toContainText("E2E-MOBILE");
+      await page.getByRole("button", { name: "ปิดหน้าต่าง" }).click();
+    }
     await expectTouchTarget(page, check.primary);
     await expectNoDocumentOverflow(page);
     await expectMobileNavClearance(page);

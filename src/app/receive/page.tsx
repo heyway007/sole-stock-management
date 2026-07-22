@@ -4,15 +4,15 @@ import { useMemo, useState } from "react";
 import { Toast } from "@/components/ui/toast";
 import { DocumentForm, type DocumentMetadata } from "@/features/inventory/components/document-form";
 import { createDocumentLine, DocumentLineEditor, type DocumentLineDraft, type DocumentVariantOption } from "@/features/inventory/components/document-line-editor";
-import { validateDocument } from "@/features/inventory/domain/validation";
-import { InventoryProvider, useInventory } from "@/features/inventory/inventory-provider";
+import { DocumentValidationError, validateDocument } from "@/features/inventory/domain/validation";
+import { useInventory } from "@/features/inventory/inventory-provider";
 
 function isDraftDirty(line: DocumentLineDraft) {
   return !!(line.modelId || line.colorId || line.variantId || line.quantity);
 }
 
 export function ReceivePageContent() {
-  const { snapshot, loading, error, postDocument } = useInventory();
+  const { snapshot, loading, error, postDocument, ensureVariant } = useInventory();
   const [lines, setLines] = useState<DocumentLineDraft[]>(() => [createDocumentLine()]);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -26,18 +26,32 @@ export function ReceivePageContent() {
   }, [snapshot]);
 
   async function submit(metadata: DocumentMetadata) {
+    const preparedLines = lines.map((line) => {
+      const selected = variants.find((variant) => variant.id === line.variantId);
+      const size = line.creatingVariant ? Number(line.newSize) : selected?.size ?? 0;
+      const matching = variants.find((variant) =>
+        variant.modelId === line.modelId && variant.colorId === line.colorId && variant.size === size,
+      );
+      return { draft: line, size, matching };
+    });
     const input = {
       type: "RECEIPT" as const,
       ...metadata,
-      lines: lines.map((line) => ({
-        variantId: line.variantId,
-        size: variants.find((variant) => variant.id === line.variantId)?.size ?? 0,
-        quantity: Number(line.quantity),
+      lines: preparedLines.map(({ draft, size, matching }) => ({
+        variantId: matching?.id ?? (draft.modelId && draft.colorId && size > 0
+          ? `new:${draft.modelId}:${draft.colorId}:${size}`
+          : ""),
+        size,
+        quantity: Number(draft.quantity),
       })),
     };
     const validation = validateDocument(input);
-    if (!validation.success) throw new Error(validation.errors[0].message);
-    const document = await postDocument(validation.data);
+    if (!validation.success) throw new DocumentValidationError(validation.errors);
+    const resolvedLines = await Promise.all(preparedLines.map(async ({ draft, size, matching }, index) => {
+      const variant = matching ?? await ensureVariant(draft.modelId, draft.colorId, size);
+      return { ...validation.data.lines[index], variantId: variant.id, size: variant.size };
+    }));
+    const document = await postDocument({ ...validation.data, lines: resolvedLines });
     setLines([createDocumentLine()]);
     setToast(`รับสินค้าเรียบร้อย เลขที่เอกสาร ${document.number}`);
   }
@@ -55,7 +69,16 @@ export function ReceivePageContent() {
         dirty={lines.some(isDraftDirty)}
         onSubmit={submit}
       >
-        <DocumentLineEditor section="DEFAULT" lines={lines} onChange={setLines} variants={variants} showAvailable={false} />
+        <DocumentLineEditor
+          section="DEFAULT"
+          lines={lines}
+          onChange={setLines}
+          variants={variants}
+          showAvailable={false}
+          catalogModels={snapshot.models.filter((model) => model.active).map(({ id, name }) => ({ id, name }))}
+          catalogColors={snapshot.colors.filter((color) => color.active).map(({ id, name }) => ({ id, name }))}
+          allowVariantCreation
+        />
       </DocumentForm>
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
     </>
@@ -63,5 +86,5 @@ export function ReceivePageContent() {
 }
 
 export default function ReceivePage() {
-  return <InventoryProvider><ReceivePageContent /></InventoryProvider>;
+  return <ReceivePageContent />;
 }

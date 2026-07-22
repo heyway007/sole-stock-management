@@ -10,7 +10,7 @@ import {
   Boxes,
   PackageCheck,
 } from "lucide-react";
-import { InventoryProvider, useInventory } from "@/features/inventory/inventory-provider";
+import { useInventory } from "@/features/inventory/inventory-provider";
 import { selectDashboardSummary, selectLowStock } from "@/features/inventory/domain/selectors";
 import type { MovementType } from "@/features/inventory/domain/types";
 import { StockStatus } from "@/features/inventory/components/stock-status";
@@ -43,11 +43,11 @@ export function getDashboardDate(date: Date): { dateTime: string; label: string 
 export function Dashboard() {
   const { snapshot, loading, error } = useInventory();
 
-  if (loading) {
+  if (loading && !snapshot) {
     return <div className="page-state" role="status">กำลังโหลดข้อมูลสต็อก…</div>;
   }
 
-  if (error) {
+  if (error && !snapshot) {
     return <div className="page-state page-state--error" role="alert">{error}</div>;
   }
 
@@ -155,6 +155,6 @@ export function Dashboard() {
 export default function Home() {
   return <>
     <span className="sr-only">ยินดีต้อนรับสู่ SOLE STOCK</span>
-    <InventoryProvider><Dashboard /></InventoryProvider>
+    <Dashboard />
   </>;
 }

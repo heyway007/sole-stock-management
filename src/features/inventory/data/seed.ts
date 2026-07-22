@@ -39,5 +39,5 @@ export function createSeedSnapshot(): InventorySnapshot {
     variants.map((variant, index) => [variant.id, index % 7 === 0 ? 2 : 8 + (index % 13)]),
   );
 
-  return { version: 1, models, colors, variants, balances, documents: [] };
+  return { version: 1, revision: 0, models, colors, variants, balances, documents: [] };
 }

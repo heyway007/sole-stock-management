@@ -5,6 +5,7 @@ export interface HistoryFilters {
   type: MovementType | "ALL";
   startDate: string;
   endDate: string;
+  variantId?: string;
 }
 
 export interface HistoryRow {
@@ -24,6 +25,7 @@ export function selectHistory(snapshot: InventorySnapshot, filters: HistoryFilte
   const colors = new Map(snapshot.colors.map((color) => [color.id, color]));
 
   return snapshot.documents
+    .filter((document) => !filters.variantId || document.lines.some((line) => line.variantId === filters.variantId))
     .filter((document) => filters.type === "ALL" || document.type === filters.type)
     .filter((document) => !filters.startDate || document.effectiveDate >= filters.startDate)
     .filter((document) => !filters.endDate || document.effectiveDate <= filters.endDate)

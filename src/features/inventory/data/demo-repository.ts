@@ -12,6 +12,24 @@ import type { InventoryRepository } from "./inventory-repository";
 import { createSeedSnapshot } from "./seed";
 
 export const INVENTORY_STORAGE_KEY = "sole-stock.inventory.v1";
+const INVENTORY_LOCK_NAME = "sole-stock.inventory.mutation.v1";
+
+export interface InventoryLockManager {
+  request<T>(name: string, callback: () => Promise<T> | T): Promise<T>;
+}
+
+export interface DemoInventoryRepositoryOptions {
+  createId?: () => string;
+  lockManager?: InventoryLockManager;
+  storageEventTarget?: Pick<EventTarget, "addEventListener" | "removeEventListener">;
+}
+
+function browserLockManager(): InventoryLockManager | undefined {
+  if (typeof navigator === "undefined" || !navigator.locks) return undefined;
+  return {
+    request: (name, callback) => navigator.locks.request(name, () => callback()),
+  };
+}
 
 function cloneSnapshot(snapshot: InventorySnapshot): InventorySnapshot {
   return {
@@ -97,6 +115,7 @@ function isSnapshot(value: unknown): value is InventorySnapshot {
   if (!isRecord(value)) return false;
   const balances = value.balances;
   if (value.version !== 1
+    || (value.revision !== undefined && (!Number.isInteger(value.revision) || (value.revision as number) < 0))
     || !Array.isArray(value.models)
     || !Array.isArray(value.colors)
     || !Array.isArray(value.variants)
@@ -149,108 +168,200 @@ function errorForPost(error: unknown): Error {
 
 export class DemoInventoryRepository implements InventoryRepository {
   private snapshot: InventorySnapshot | null = null;
+  private readonly createId: () => string;
+  private readonly lockManager: InventoryLockManager | undefined;
+  private readonly storageEventTarget: Pick<EventTarget, "addEventListener" | "removeEventListener"> | undefined;
 
-  constructor(private readonly storage: Storage) {}
+  constructor(
+    private readonly storage: Storage,
+    options: DemoInventoryRepositoryOptions = {},
+  ) {
+    this.createId = options.createId ?? (() => globalThis.crypto.randomUUID());
+    this.lockManager = options.lockManager ?? browserLockManager();
+    this.storageEventTarget = options.storageEventTarget
+      ?? (typeof window === "undefined" ? undefined : window);
+  }
 
   async load(): Promise<InventorySnapshot> {
     return cloneSnapshot(this.current());
   }
 
+  subscribe(listener: () => void): () => void {
+    if (!this.storageEventTarget) return () => undefined;
+    const handleStorage = (event: Event) => {
+      const storageEvent = event as StorageEvent;
+      if (storageEvent.key !== null && storageEvent.key !== INVENTORY_STORAGE_KEY) return;
+      if (storageEvent.storageArea && storageEvent.storageArea !== this.storage) return;
+      this.snapshot = null;
+      listener();
+    };
+    this.storageEventTarget.addEventListener("storage", handleStorage);
+    return () => this.storageEventTarget?.removeEventListener("storage", handleStorage);
+  }
+
   async postDocument(input: StockDocumentInput): Promise<StockDocument> {
-    const current = this.current();
-    const ordinal = current.documents.length + 1;
-    let next: InventorySnapshot;
-    try {
-      next = postDocument(current, input, {
-        documentId: () => `doc-${ordinal}`,
-        lineId: (index) => `doc-${ordinal}-line-${index + 1}`,
-        documentNumber: () => `STK-${input.effectiveDate.replaceAll("-", "")}-${String(ordinal).padStart(4, "0")}`,
-        now: () => new Date().toISOString(),
-      });
-    } catch (error) {
-      throw errorForPost(error);
+    return this.mutate((current) => {
+      const ordinal = current.documents.length + 1;
+      const documentId = this.createId();
+      const lineIds = input.lines.map(() => this.createId());
+      let next: InventorySnapshot;
+      try {
+        next = postDocument(current, input, {
+          documentId: () => documentId,
+          lineId: (index) => lineIds[index],
+          documentNumber: () => `STK-${input.effectiveDate.replaceAll("-", "")}-${String(ordinal).padStart(4, "0")}`,
+          now: () => new Date().toISOString(),
+        });
+      } catch (error) {
+        throw errorForPost(error);
+      }
+      const document = next.documents.at(-1)!;
+      return {
+        snapshot: next,
+        result: { ...document, lines: document.lines.map((line) => ({ ...line })) },
+      };
+    });
+  }
+
+  async ensureVariant(modelId: string, colorId: string, size: number): Promise<ProductVariant> {
+    if (!Number.isFinite(size) || size <= 0 || Math.round(size * 10) !== size * 10) {
+      throw new Error("ไซซ์รองเท้าต้องเป็นเลขทศนิยมบวกไม่เกิน 1 ตำแหน่ง");
     }
-    const document = next.documents.at(-1)!;
-    this.publish(next);
-    return { ...document, lines: document.lines.map((line) => ({ ...line })) };
+    return this.mutate((snapshot) => {
+      if (!snapshot.models.some((model) => model.id === modelId && model.active)) {
+        throw new Error("ไม่พบรุ่นรองเท้าที่เปิดใช้งาน");
+      }
+      if (!snapshot.colors.some((color) => color.id === colorId && color.active)) {
+        throw new Error("ไม่พบสีที่เปิดใช้งาน");
+      }
+      const existing = snapshot.variants.find((variant) =>
+        variant.modelId === modelId && variant.colorId === colorId && variant.size === size,
+      );
+      if (existing) {
+        const variant = existing.active ? existing : { ...existing, active: true };
+        return {
+          snapshot: existing.active
+            ? snapshot
+            : { ...snapshot, variants: snapshot.variants.map((item) => item.id === variant.id ? variant : item) },
+          result: { ...variant },
+        };
+      }
+      const variant: ProductVariant = {
+        id: this.createId(),
+        modelId,
+        colorId,
+        size,
+        lowStockThreshold: 3,
+        active: true,
+      };
+      return {
+        snapshot: {
+          ...snapshot,
+          variants: [...snapshot.variants, variant],
+          balances: { ...snapshot.balances, [variant.id]: 0 },
+        },
+        result: { ...variant },
+      };
+    });
   }
 
   async saveLowStockThreshold(variantId: string, threshold: number): Promise<void> {
     if (!Number.isInteger(threshold) || threshold < 0) {
       throw new Error("เกณฑ์สต็อกต่ำต้องเป็นจำนวนเต็มตั้งแต่ 0 ขึ้นไป");
     }
-    this.mutate((snapshot) => {
+    await this.mutate((snapshot) => {
       if (!snapshot.variants.some((variant) => variant.id === variantId)) throw new Error("ไม่พบสินค้าที่เลือก");
       return {
-        ...snapshot,
-        variants: snapshot.variants.map((variant) =>
-          variant.id === variantId ? { ...variant, lowStockThreshold: threshold } : variant,
-        ),
+        snapshot: {
+          ...snapshot,
+          variants: snapshot.variants.map((variant) =>
+            variant.id === variantId ? { ...variant, lowStockThreshold: threshold } : variant,
+          ),
+        },
+        result: undefined,
       };
     });
   }
 
   async addModel(name: string): Promise<ShoeModel> {
     const trimmed = validatedName(name);
-    const model: ShoeModel = { id: `model-${encodeURIComponent(normalizedName(trimmed))}`, name: trimmed, active: true };
-    this.mutate((snapshot) => {
+    const model: ShoeModel = { id: this.createId(), name: trimmed, active: true };
+    await this.mutate((snapshot) => {
       if (snapshot.models.some((item) => normalizedName(item.name) === normalizedName(trimmed))) {
         throw new Error("มีชื่อรุ่นนี้ซ้ำอยู่แล้ว");
       }
-      return { ...snapshot, models: [...snapshot.models, model] };
+      return { snapshot: { ...snapshot, models: [...snapshot.models, model] }, result: undefined };
     });
     return { ...model };
   }
 
   async renameModel(id: string, name: string): Promise<void> {
-    this.renameCatalog("models", id, name, "รุ่น");
+    await this.renameCatalog("models", id, name, "รุ่น");
   }
 
   async setModelActive(id: string, active: boolean): Promise<void> {
-    this.setCatalogActive("models", id, active, "รุ่น");
+    await this.setCatalogActive("models", id, active, "รุ่น");
   }
 
   async addColor(name: string): Promise<Color> {
     const trimmed = validatedName(name);
-    const color: Color = { id: `color-${encodeURIComponent(normalizedName(trimmed))}`, name: trimmed, active: true };
-    this.mutate((snapshot) => {
+    const color: Color = { id: this.createId(), name: trimmed, active: true };
+    await this.mutate((snapshot) => {
       if (snapshot.colors.some((item) => normalizedName(item.name) === normalizedName(trimmed))) {
         throw new Error("มีชื่อสีนี้ซ้ำอยู่แล้ว");
       }
-      return { ...snapshot, colors: [...snapshot.colors, color] };
+      return { snapshot: { ...snapshot, colors: [...snapshot.colors, color] }, result: undefined };
     });
     return { ...color };
   }
 
   async renameColor(id: string, name: string): Promise<void> {
-    this.renameCatalog("colors", id, name, "สี");
+    await this.renameCatalog("colors", id, name, "สี");
   }
 
   async setColorActive(id: string, active: boolean): Promise<void> {
-    this.setCatalogActive("colors", id, active, "สี");
+    await this.setCatalogActive("colors", id, active, "สี");
   }
 
-  private current(): InventorySnapshot {
-    if (this.snapshot) return this.snapshot;
+  private readStoredSnapshot(): InventorySnapshot | null {
     const stored = this.storage.getItem(INVENTORY_STORAGE_KEY);
     if (stored) {
       try {
         const parsed: unknown = JSON.parse(stored);
         if (isSnapshot(parsed)) {
-          this.snapshot = cloneSnapshot(parsed);
-          return this.snapshot;
+          return cloneSnapshot(parsed);
         }
       } catch {
         // Corrupt persisted data intentionally remains untouched until a successful mutation.
       }
     }
-    this.snapshot = createSeedSnapshot();
+    return null;
+  }
+
+  private current(): InventorySnapshot {
+    if (this.snapshot) return this.snapshot;
+    this.snapshot = this.readStoredSnapshot() ?? createSeedSnapshot();
     return this.snapshot;
   }
 
-  private mutate(project: (snapshot: InventorySnapshot) => InventorySnapshot): void {
-    const next = project(this.current());
-    this.publish(next);
+  private async mutate<T>(
+    project: (snapshot: InventorySnapshot) => { snapshot: InventorySnapshot; result: T },
+  ): Promise<T> {
+    const operation = () => {
+      const current = this.readStoredSnapshot() ?? createSeedSnapshot();
+      const baseRevision = current.revision ?? 0;
+      const projected = project(current);
+      const latestRevision = this.readStoredSnapshot()?.revision ?? 0;
+      if (latestRevision !== baseRevision) {
+        throw new Error("ข้อมูลสต็อกมีการเปลี่ยนแปลง กรุณาลองอีกครั้ง");
+      }
+      const next = { ...projected.snapshot, revision: baseRevision + 1 };
+      this.publish(next);
+      return projected.result;
+    };
+    return this.lockManager
+      ? this.lockManager.request(INVENTORY_LOCK_NAME, operation)
+      : operation();
   }
 
   private publish(next: InventorySnapshot): void {
@@ -258,23 +369,29 @@ export class DemoInventoryRepository implements InventoryRepository {
     this.snapshot = next;
   }
 
-  private renameCatalog(kind: "models" | "colors", id: string, name: string, label: string): void {
+  private async renameCatalog(kind: "models" | "colors", id: string, name: string, label: string): Promise<void> {
     const trimmed = validatedName(name);
-    this.mutate((snapshot) => {
+    await this.mutate((snapshot) => {
       const records = snapshot[kind];
       if (!records.some((record) => record.id === id)) throw new Error(`ไม่พบ${label}ที่เลือก`);
       if (records.some((record) => record.id !== id && normalizedName(record.name) === normalizedName(trimmed))) {
         throw new Error(`มีชื่อ${label}นี้ซ้ำอยู่แล้ว`);
       }
-      return { ...snapshot, [kind]: records.map((record) => record.id === id ? { ...record, name: trimmed } : record) };
+      return {
+        snapshot: { ...snapshot, [kind]: records.map((record) => record.id === id ? { ...record, name: trimmed } : record) },
+        result: undefined,
+      };
     });
   }
 
-  private setCatalogActive(kind: "models" | "colors", id: string, active: boolean, label: string): void {
-    this.mutate((snapshot) => {
+  private async setCatalogActive(kind: "models" | "colors", id: string, active: boolean, label: string): Promise<void> {
+    await this.mutate((snapshot) => {
       const records = snapshot[kind];
       if (!records.some((record) => record.id === id)) throw new Error(`ไม่พบ${label}ที่เลือก`);
-      return { ...snapshot, [kind]: records.map((record) => record.id === id ? { ...record, active } : record) };
+      return {
+        snapshot: { ...snapshot, [kind]: records.map((record) => record.id === id ? { ...record, active } : record) },
+        result: undefined,
+      };
     });
   }
 }

@@ -64,6 +64,7 @@ export interface StockDocument {
 
 export interface InventorySnapshot {
   version: 1;
+  revision?: number;
   models: ShoeModel[];
   colors: Color[];
   variants: ProductVariant[];

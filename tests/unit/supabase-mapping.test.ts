@@ -20,6 +20,7 @@ describe("Supabase inventory mapping", () => {
       balances: [{ variant_id: "variant-1", quantity: 7 }],
       documents: [{
         id: "document-1",
+        client_request_id: "00000000-0000-4000-8000-000000000001",
         document_number: "STK-20260722-0001",
         movement_type: "EXCHANGE",
         effective_date: "2026-07-22",

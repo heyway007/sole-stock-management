@@ -12,6 +12,7 @@ import {
   Settings2,
 } from "lucide-react";
 import type { ComponentType, PropsWithChildren } from "react";
+import { useInventory } from "@/features/inventory/inventory-provider";
 
 interface NavigationItem {
   href: string;
@@ -52,6 +53,8 @@ function NavigationLinks({ pathname, mobile = false }: { pathname: string; mobil
 
 export function AppShell({ children }: PropsWithChildren) {
   const pathname = usePathname();
+  const { mode } = useInventory();
+  const modeLabel = mode === "supabase" ? "โหมด Supabase" : "โหมดสาธิต";
 
   return (
     <div className="app-shell">
@@ -63,12 +66,13 @@ export function AppShell({ children }: PropsWithChildren) {
         <nav className="sidebar-nav" aria-label="เมนูหลัก">
           <NavigationLinks pathname={pathname} />
         </nav>
-        <div className="demo-badge"><span aria-hidden />โหมดสาธิต</div>
+        <div className="demo-badge"><span aria-hidden />{modeLabel}</div>
       </aside>
 
       <main className="app-main">{children}</main>
 
       <nav className="mobile-nav" aria-label="เมนูมือถือ">
+        <div className="mobile-backend-badge"><span aria-hidden />{modeLabel}</div>
         <div className="mobile-nav__scroller">
           <NavigationLinks pathname={pathname} mobile />
         </div>
