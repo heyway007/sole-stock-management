@@ -170,6 +170,29 @@ test("demo inventory workflow stays accurate on desktop and routes stay usable o
     const newVariant = inventory.getByRole("row").filter({ hasText: "E2E Runner" }).filter({ hasText: "E2E White" });
     await expect(newVariant.getByRole("cell", { name: "44.5", exact: true })).toBeVisible();
     await expect(newVariant.getByRole("cell", { name: "2 คู่", exact: true })).toBeVisible();
+
+    const inventorySummary = page.getByRole("group", { name: "สรุปสินค้าคงคลัง" });
+    await page.getByRole("button", { name: "ล้างสต๊อก" }).click();
+    const clearDialog = page.getByRole("dialog", { name: "ยืนยันล้างสต๊อก" });
+    await clearDialog.getByRole("textbox", { name: "พิมพ์คำยืนยันล้างสต๊อก" }).fill("ล้าง stock");
+    await clearDialog.getByRole("button", { name: "ยืนยันล้างสต๊อก" }).click();
+    await expect(clearDialog).toContainText("กรุณาพิมพ์ ล้างสต๊อก ให้ตรงกัน");
+    await clearDialog.getByRole("textbox", { name: "พิมพ์คำยืนยันล้างสต๊อก" }).fill("ล้างสต๊อก");
+    await clearDialog.getByRole("button", { name: "ยืนยันล้างสต๊อก" }).click();
+
+    const successDialog = page.getByRole("dialog", { name: "ล้างสต๊อกแล้ว" });
+    await expect(successDialog).toContainText("คู่");
+    await successDialog.getByRole("button", { name: "ตกลง" }).click();
+    await expect(inventorySummary.getByText("0", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "ล้างสต๊อก" })).toBeDisabled();
+
+    await mainNavigation.getByRole("link", { name: "ประวัติ" }).click();
+    const clearedHistory = page.getByRole("table", { name: "ประวัติการเคลื่อนไหวสต็อก" });
+    await expect(clearedHistory.locator("tbody tr").filter({ hasText: "CLEAR-STOCK" })).toContainText("ปรับยอด");
+
+    await mainNavigation.getByRole("link", { name: "จัดการสินค้า" }).click();
+    await expect(page.getByRole("region", { name: "จัดการรุ่นรองเท้า" })).toContainText("E2E Runner");
+    await expect(page.getByRole("region", { name: "จัดการสี" })).toContainText("E2E White");
     return;
   }
 
@@ -222,6 +245,9 @@ test("demo inventory workflow stays accurate on desktop and routes stay usable o
       await cards.getByRole("button", { name: /แบบการ์ด/ }).click();
       await expect(page.getByRole("dialog", { name: /รายละเอียดเอกสาร/ })).toContainText("E2E-MOBILE");
       await page.getByRole("button", { name: "ปิดหน้าต่าง" }).click();
+    }
+    if (check.name === "สินค้าคงคลัง") {
+      await expectTouchTarget(page, page.getByRole("button", { name: "ล้างสต๊อก" }));
     }
     await expectTouchTarget(page, check.primary);
     await expectNoDocumentOverflow(page);
