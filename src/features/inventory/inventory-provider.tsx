@@ -13,6 +13,7 @@ interface InventoryContextValue {
   warning: string | null;
   refresh(): Promise<void>;
   postDocument(input: StockDocumentInput): Promise<StockDocument>;
+  clearStock(effectiveDate: string): Promise<StockDocument | null>;
   ensureVariant(modelId: string, colorId: string, size: number): Promise<ProductVariant>;
   saveLowStockThreshold(variantId: string, threshold: number): Promise<void>;
   catalog: Pick<InventoryRepository,
@@ -115,6 +116,10 @@ export function InventoryProvider({ children, factoryOptions, repository }: Inve
     (input: StockDocumentInput) => runMutation((repository) => repository.postDocument(input)),
     [runMutation],
   );
+  const clearStock = useCallback(
+    (effectiveDate: string) => runMutation((repository) => repository.clearStock(effectiveDate)),
+    [runMutation],
+  );
   const ensureVariant = useCallback(
     (modelId: string, colorId: string, size: number) =>
       runMutation((repository) => repository.ensureVariant(modelId, colorId, size)),
@@ -133,7 +138,7 @@ export function InventoryProvider({ children, factoryOptions, repository }: Inve
     setColorActive: (id: string, active: boolean) => runMutation((repository) => repository.setColorActive(id, active)),
   }), [runMutation]);
 
-  return <InventoryContext value={{ snapshot, loading, mode, error, warning, refresh, postDocument, ensureVariant, saveLowStockThreshold, catalog }}>{children}</InventoryContext>;
+  return <InventoryContext value={{ snapshot, loading, mode, error, warning, refresh, postDocument, clearStock, ensureVariant, saveLowStockThreshold, catalog }}>{children}</InventoryContext>;
 }
 
 export function useInventory(): InventoryContextValue {

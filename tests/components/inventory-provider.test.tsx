@@ -76,6 +76,11 @@ function InventoryState() {
     {inventory.error && <p role="alert">{inventory.error}</p>}
     {inventory.warning && <p role="alert">{inventory.warning}</p>}
     {actionError && <p role="alert">{actionError}</p>}
+    {inventory.snapshot && (
+      <button onClick={() => void inventory.clearStock("2026-07-22")}>
+        ล้างสต๊อกทดสอบ
+      </button>
+    )}
     {variant && <button onClick={() => void inventory.postDocument({
       type: "RECEIPT",
       effectiveDate: "2026-07-22",
@@ -122,6 +127,14 @@ describe("InventoryProvider", () => {
     await screen.findByText("จำนวน: 2");
     fireEvent.click(screen.getByRole("button", { name: "รับสินค้า" }));
     expect(await screen.findByText("จำนวน: 4")).toBeInTheDocument();
+  });
+
+  it("refreshes the snapshot after clearing all stock", async () => {
+    render(<InventoryProvider factoryOptions={{ storage: new MemoryStorage() }}><InventoryState /></InventoryProvider>);
+
+    await screen.findByText("จำนวน: 2");
+    fireEvent.click(screen.getByRole("button", { name: "ล้างสต๊อกทดสอบ" }));
+    expect(await screen.findByText("จำนวน: 0")).toBeInTheDocument();
   });
 
   it("refreshes its retained snapshot when the repository reports a cross-tab change", async () => {
