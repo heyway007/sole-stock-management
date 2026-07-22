@@ -1,7 +1,7 @@
 # Production Order and Printable A4 Design
 
 **Date:** 2026-07-22
-**Status:** Approved in conversation; awaiting written-spec review
+**Status:** Approved
 
 ## Objective
 
