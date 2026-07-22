@@ -4,8 +4,12 @@ import type { InventoryRepository } from "./inventory-repository";
 export interface RepositoryFactoryOptions {
   environment?: Record<string, string | undefined>;
   storage?: Storage;
-  supabaseRepository?: InventoryRepository;
   createSupabaseRepository?: () => InventoryRepository;
+}
+
+export interface InventoryRepositorySelection {
+  repository: InventoryRepository;
+  mode: "demo" | "supabase";
 }
 
 function environmentFor(options: RepositoryFactoryOptions): Record<string, string | undefined> {
@@ -23,13 +27,14 @@ export function isSupabaseInventoryConfigured(options: RepositoryFactoryOptions 
     && Boolean(environment.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 }
 
-export function createInventoryRepository(options: RepositoryFactoryOptions = {}): InventoryRepository {
+export function createInventoryRepository(options: RepositoryFactoryOptions = {}): InventoryRepositorySelection {
   if (isSupabaseInventoryConfigured(options)) {
-    if (options.supabaseRepository) return options.supabaseRepository;
-    if (options.createSupabaseRepository) return options.createSupabaseRepository();
+    if (options.createSupabaseRepository) {
+      return { repository: options.createSupabaseRepository(), mode: "supabase" };
+    }
   }
 
   const storage = options.storage ?? (typeof window === "undefined" ? undefined : window.localStorage);
   if (!storage) throw new Error("ไม่สามารถเปิดพื้นที่จัดเก็บข้อมูลในเบราว์เซอร์ได้");
-  return new DemoInventoryRepository(storage);
+  return { repository: new DemoInventoryRepository(storage), mode: "demo" };
 }

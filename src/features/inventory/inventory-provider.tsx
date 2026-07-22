@@ -1,8 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type PropsWithChildren } from "react";
-import { DemoInventoryRepository } from "./data/demo-repository";
-import { createInventoryRepository, isSupabaseInventoryConfigured } from "./data/repository-factory";
+import { createInventoryRepository, type InventoryRepositorySelection, type RepositoryFactoryOptions } from "./data/repository-factory";
 import type { InventoryRepository } from "./data/inventory-repository";
 import type { InventorySnapshot, StockDocument, StockDocumentInput } from "./domain/types";
 
@@ -20,62 +19,58 @@ interface InventoryContextValue {
 }
 
 interface InventoryProviderProps extends PropsWithChildren {
-  repository?: InventoryRepository;
+  factoryOptions?: RepositoryFactoryOptions;
 }
 
 const InventoryContext = createContext<InventoryContextValue | null>(null);
 const LOAD_ERROR = "ไม่สามารถโหลดข้อมูลสต็อกได้ กรุณาลองใหม่อีกครั้ง";
 const SAVE_ERROR = "ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้ง";
 
-function modeFor(repository: InventoryRepository): "demo" | "supabase" {
-  return repository instanceof DemoInventoryRepository || !isSupabaseInventoryConfigured() ? "demo" : "supabase";
-}
-
-export function InventoryProvider({ children, repository: repositoryProp }: InventoryProviderProps) {
-  const repositoryRef = useRef<InventoryRepository | null>(repositoryProp ?? null);
+export function InventoryProvider({ children, factoryOptions }: InventoryProviderProps) {
+  const selectionRef = useRef<InventoryRepositorySelection | null>(null);
   const [snapshot, setSnapshot] = useState<InventorySnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<"demo" | "supabase">("demo");
   const [error, setError] = useState<string | null>(null);
 
-  const getRepository = useCallback(() => {
-    if (!repositoryRef.current) repositoryRef.current = createInventoryRepository();
-    return repositoryRef.current;
-  }, []);
+  const getSelection = useCallback(() => {
+    if (!selectionRef.current) selectionRef.current = createInventoryRepository(factoryOptions);
+    return selectionRef.current;
+  }, [factoryOptions]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const repository = getRepository();
-      setSnapshot(await repository.load());
-      setMode(modeFor(repository));
+      const selection = getSelection();
+      setMode(selection.mode);
+      setSnapshot(await selection.repository.load());
     } catch {
       setError(LOAD_ERROR);
     } finally {
       setLoading(false);
     }
-  }, [getRepository]);
+  }, [getSelection]);
 
   useEffect(() => {
-    repositoryRef.current = repositoryProp ?? null;
+    selectionRef.current = null;
     let cancelled = false;
     queueMicrotask(() => {
       if (!cancelled) void refresh();
     });
     return () => { cancelled = true; };
-  }, [repositoryProp, refresh]);
+  }, [factoryOptions, refresh]);
 
   const runMutation = useCallback(async <T,>(mutation: (repository: InventoryRepository) => Promise<T>): Promise<T> => {
     try {
-      const result = await mutation(getRepository());
+      const result = await mutation(getSelection().repository);
       await refresh();
       return result;
     } catch {
       setError(SAVE_ERROR);
       throw new Error(SAVE_ERROR);
     }
-  }, [getRepository, refresh]);
+  }, [getSelection, refresh]);
 
   const postDocument = useCallback(
     (input: StockDocumentInput) => runMutation((repository) => repository.postDocument(input)),

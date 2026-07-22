@@ -59,7 +59,14 @@ describe("InventoryProvider", () => {
 
   it("shows loading until the injected repository resolves", async () => {
     const repository = new DelayedDemoRepository(new MemoryStorage());
-    render(<InventoryProvider repository={repository}><InventoryState /></InventoryProvider>);
+    render(<InventoryProvider factoryOptions={{
+      environment: {
+        NEXT_PUBLIC_INVENTORY_BACKEND: "supabase",
+        NEXT_PUBLIC_SUPABASE_URL: "https://inventory.example.supabase.co",
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: "public-key",
+      },
+      createSupabaseRepository: () => repository,
+    }}><InventoryState /></InventoryProvider>);
 
     expect(screen.getByText("กำลังโหลด")).toBeInTheDocument();
     repository.release();
@@ -67,7 +74,7 @@ describe("InventoryProvider", () => {
   });
 
   it("refreshes the snapshot after a successful document post", async () => {
-    render(<InventoryProvider repository={new DemoInventoryRepository(new MemoryStorage())}><InventoryState /></InventoryProvider>);
+    render(<InventoryProvider factoryOptions={{ storage: new MemoryStorage() }}><InventoryState /></InventoryProvider>);
 
     await screen.findByText("จำนวน: 2");
     fireEvent.click(screen.getByRole("button", { name: "รับสินค้า" }));
@@ -76,7 +83,14 @@ describe("InventoryProvider", () => {
 
   it("keeps the existing snapshot and presents Thai action copy after a repository error", async () => {
     const repository = new FailingDemoRepository(new MemoryStorage());
-    render(<InventoryProvider repository={repository}><InventoryState /></InventoryProvider>);
+    render(<InventoryProvider factoryOptions={{
+      environment: {
+        NEXT_PUBLIC_INVENTORY_BACKEND: "supabase",
+        NEXT_PUBLIC_SUPABASE_URL: "https://inventory.example.supabase.co",
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: "public-key",
+      },
+      createSupabaseRepository: () => repository,
+    }}><InventoryState /></InventoryProvider>);
 
     await screen.findByText("จำนวน: 2");
     repository.failPosts = true;
@@ -87,8 +101,36 @@ describe("InventoryProvider", () => {
   });
 
   it("indicates demo mode for an injected in-memory repository", async () => {
-    render(<InventoryProvider repository={new DemoInventoryRepository(new MemoryStorage())}><InventoryState /></InventoryProvider>);
+    render(<InventoryProvider factoryOptions={{ storage: new MemoryStorage() }}><InventoryState /></InventoryProvider>);
 
     await waitFor(() => expect(screen.getByText("โหมด: demo")).toBeInTheDocument());
+  });
+
+  it("uses the factory-selected Supabase mode for a fully configured adapter", async () => {
+    render(<InventoryProvider factoryOptions={{
+      environment: {
+        NEXT_PUBLIC_INVENTORY_BACKEND: "supabase",
+        NEXT_PUBLIC_SUPABASE_URL: "https://inventory.example.supabase.co",
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: "public-key",
+      },
+      createSupabaseRepository: () => new DemoInventoryRepository(new MemoryStorage()),
+    }}><InventoryState /></InventoryProvider>);
+
+    expect(await screen.findByText("โหมด: supabase")).toBeInTheDocument();
+  });
+
+  it("keeps a partially configured adapter in demo mode", async () => {
+    render(<InventoryProvider factoryOptions={{
+      environment: {
+        NEXT_PUBLIC_INVENTORY_BACKEND: "supabase",
+        NEXT_PUBLIC_SUPABASE_URL: "https://inventory.example.supabase.co",
+      },
+      storage: new MemoryStorage(),
+      createSupabaseRepository: () => {
+        throw new Error("adapter must not be created");
+      },
+    }}><InventoryState /></InventoryProvider>);
+
+    expect(await screen.findByText("โหมด: demo")).toBeInTheDocument();
   });
 });
