@@ -23,6 +23,15 @@ async function chooseVariant(
   await editor.getByLabel(`จำนวน (คู่) รายการ ${row}`).fill(quantity);
 }
 
+function localDateAfter(days: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 async function expectNoDocumentOverflow(page: Page) {
   const viewport = page.viewportSize();
   expect(viewport, "project should configure an explicit viewport").not.toBeNull();
@@ -75,6 +84,7 @@ async function expectMobileNavClearance(page: Page) {
 }
 
 test("demo inventory workflow stays accurate on desktop and routes stay usable on mobile", async ({ page }, testInfo) => {
+  test.setTimeout(120_000);
   expect(testInfo.config.projects.map((project) => project.name).sort()).toEqual(
     [desktopProject, mobileProject, mobileMinProject].sort(),
   );
@@ -121,6 +131,95 @@ test("demo inventory workflow stays accurate on desktop and routes stay usable o
     await page.getByRole("button", { name: "บันทึกรับสินค้า" }).click();
     await expect(page.getByRole("status", { name: "บันทึกสำเร็จ" })).toContainText("รับสินค้าเรียบร้อย");
 
+    await mainNavigation.getByRole("link", { name: "ใบผลิตออเดอร์" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "ใบผลิตออเดอร์" })).toBeVisible();
+    await page.getByRole("link", { name: "สร้างใบผลิต" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "สร้างใบผลิตออเดอร์" })).toBeVisible();
+    const firstExpectedDate = localDateAfter(14);
+    await page.getByLabel("วันที่กำหนดรับ").fill(firstExpectedDate);
+    await page.getByLabel("หมายเหตุ").fill("ผลิตเติมสต๊อกสำหรับ E2E");
+    const productionEditor = page.getByRole("region", { name: "รายการสั่งผลิต" });
+    await chooseVariant(productionEditor, 1, {
+      model: "E2E Runner", color: "E2E White", size: "44.5", quantity: "6",
+    });
+    await productionEditor.getByRole("button", { name: "เพิ่มรายการ" }).click();
+    await chooseVariant(productionEditor, 2, {
+      model: "Paris", color: "Black", size: "38", quantity: "5",
+    });
+    await page.getByRole("button", { name: "บันทึกใบผลิต" }).click();
+
+    const firstOrderHeading = page.getByRole("heading", { level: 1 });
+    await expect(firstOrderHeading).toHaveText(/^PO-/);
+    const firstOrderNumber = (await firstOrderHeading.textContent())!.trim();
+    await expect(page.getByText("รอรับเข้า", { exact: true })).toBeVisible();
+    await expect(page.getByRole("region", { name: "ข้อมูลใบผลิต" })).toContainText("2 รายการ");
+    await expect(page.getByRole("region", { name: "ข้อมูลใบผลิต" })).toContainText("11 คู่");
+
+    await page.getByRole("link", { name: "แก้ไข" }).click();
+    const editedExpectedDate = localDateAfter(21);
+    await page.getByLabel("วันที่กำหนดรับ").fill(editedExpectedDate);
+    await page.getByRole("button", { name: "บันทึกใบผลิต" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: firstOrderNumber })).toBeVisible();
+    await expect(page.getByRole("region", { name: "ข้อมูลใบผลิต" })).toContainText(editedExpectedDate);
+
+    await page.getByRole("link", { name: "พิมพ์ใบผลิต" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "ใบผลิตออเดอร์" })).toBeVisible();
+    await expect(page.locator(".production-print-page")).toContainText(firstOrderNumber);
+    await expect(page.locator(".production-print-page")).toContainText("E2E Runner");
+    await expect(page.locator(".production-print-page")).toContainText("11 คู่");
+    await page.emulateMedia({ media: "print" });
+    await expect(page.locator(".sidebar")).toBeHidden();
+    await expect(page.locator(".mobile-nav")).toBeHidden();
+    await expect(page.locator(".print-controls")).toBeHidden();
+    await expect(page.locator(".production-print-page")).toBeVisible();
+    await page.emulateMedia({ media: "screen" });
+    await page.getByRole("link", { name: "กลับไปใบผลิต" }).click();
+
+    await page.getByRole("button", { name: "รับเข้าสต๊อก" }).click();
+    const receiveProductionDialog = page.getByRole("dialog", { name: "ยืนยันรับเข้าสต๊อก" });
+    await expect(receiveProductionDialog).toContainText("11 คู่");
+    await receiveProductionDialog.getByRole("button", { name: "ยืนยันรับเข้าสต๊อก" }).click();
+    const receiveSuccessDialog = page.getByRole("dialog", { name: "รับเข้าสต๊อกแล้ว" });
+    const successText = await receiveSuccessDialog.textContent();
+    const receiptNumber = successText?.match(/STK-\d{8}-\d{4}/)?.[0];
+    expect(receiptNumber, "the receipt document number should be shown").toBeTruthy();
+    await receiveSuccessDialog.getByRole("button", { name: "ตกลง" }).click();
+    await expect(page.getByText("รับเข้าแล้ว", { exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "แก้ไข" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "รับเข้าสต๊อก" })).toHaveCount(0);
+
+    await page.getByRole("link", { name: /เอกสารรับเข้า|STK-/ }).click();
+    const receiptDetail = page.getByRole("dialog", { name: `รายละเอียดเอกสาร ${receiptNumber}` });
+    await expect(receiptDetail).toContainText(firstOrderNumber);
+    await receiptDetail.getByRole("button", { name: "ปิด", exact: true }).click();
+    await page.goto("/production-orders");
+    await page.getByRole("link", { name: "สร้างใบผลิต" }).click();
+    await page.getByLabel("วันที่กำหนดรับ").fill(localDateAfter(10));
+    await chooseVariant(page.getByRole("region", { name: "รายการสั่งผลิต" }), 1, {
+      model: "Paris", color: "Black", size: "38", quantity: "4",
+    });
+    await page.getByRole("button", { name: "บันทึกใบผลิต" }).click();
+    const cancelledOrderHeading = page.getByRole("heading", { level: 1 });
+    await expect(cancelledOrderHeading).toHaveText(/^PO-/);
+    const cancelledOrderNumber = (await cancelledOrderHeading.textContent())!.trim();
+    await page.getByRole("button", { name: "ยกเลิกใบผลิต" }).click();
+    const cancelDialog = page.getByRole("dialog", { name: "ยืนยันยกเลิกใบผลิต" });
+    await cancelDialog.getByRole("button", { name: "ยืนยันยกเลิกใบผลิต" }).click();
+    const cancelSuccessDialog = page.getByRole("dialog", { name: "ยกเลิกใบผลิตแล้ว" });
+    await cancelSuccessDialog.getByRole("button", { name: "ตกลง" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: cancelledOrderNumber })).toBeVisible();
+    await expect(page.getByText("ยกเลิก", { exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "แก้ไข" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "รับเข้าสต๊อก" })).toHaveCount(0);
+
+    await mainNavigation.getByRole("link", { name: "สินค้าคงคลัง" }).click();
+    const productionInventory = page.getByRole("table", { name: "สินค้าคงคลัง" });
+    const producedSize38 = productionInventory.getByRole("row").filter({ hasText: "Paris" }).filter({ hasText: "Black" })
+      .filter({ has: page.getByRole("cell", { name: "38", exact: true }) });
+    const producedRunner = productionInventory.getByRole("row").filter({ hasText: "E2E Runner" }).filter({ hasText: "E2E White" });
+    await expect(producedSize38.getByRole("cell", { name: "10 คู่", exact: true })).toBeVisible();
+    await expect(producedRunner.getByRole("cell", { name: "8 คู่", exact: true })).toBeVisible();
+
     await mainNavigation.getByRole("link", { name: "นำสินค้าออก" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "นำสินค้าออก" })).toBeVisible();
     await page.getByLabel("เลขอ้างอิง").fill("E2E-SALE");
@@ -150,10 +249,11 @@ test("demo inventory workflow stays accurate on desktop and routes stay usable o
     await mainNavigation.getByRole("link", { name: "ประวัติ" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "ประวัติการเคลื่อนไหว" })).toBeVisible();
     const history = page.getByRole("table", { name: "ประวัติการเคลื่อนไหวสต็อก" });
-    await expect(history.getByRole("row")).toHaveCount(4);
+    await expect(history.getByRole("row")).toHaveCount(5);
     await expect(history).toContainText("E2E-RECEIVE");
     await expect(history).toContainText("E2E-SALE");
     await expect(history).toContainText("E2E-EXCHANGE");
+    await expect(history.getByText(firstOrderNumber, { exact: true })).toHaveCount(1);
     await expect(history.getByRole("row").filter({ hasText: "E2E-RECEIVE" })).toContainText("+9 คู่");
     await expect(history.getByRole("row").filter({ hasText: "E2E-SALE" })).toContainText("-1 คู่");
     await expect(history.getByRole("row").filter({ hasText: "E2E-EXCHANGE" })).toContainText("0 คู่");
@@ -165,11 +265,11 @@ test("demo inventory workflow stays accurate on desktop and routes stay usable o
       .filter({ has: page.getByRole("cell", { name: "38", exact: true }) });
     const size385 = inventory.getByRole("row").filter({ hasText: "Paris" }).filter({ hasText: "Black" })
       .filter({ has: page.getByRole("cell", { name: "38.5", exact: true }) });
-    await expect(size38.getByRole("cell", { name: "5 คู่", exact: true })).toBeVisible();
+    await expect(size38.getByRole("cell", { name: "10 คู่", exact: true })).toBeVisible();
     await expect(size385.getByRole("cell", { name: "12 คู่", exact: true })).toBeVisible();
     const newVariant = inventory.getByRole("row").filter({ hasText: "E2E Runner" }).filter({ hasText: "E2E White" });
     await expect(newVariant.getByRole("cell", { name: "44.5", exact: true })).toBeVisible();
-    await expect(newVariant.getByRole("cell", { name: "2 คู่", exact: true })).toBeVisible();
+    await expect(newVariant.getByRole("cell", { name: "8 คู่", exact: true })).toBeVisible();
 
     const inventorySummary = page.getByRole("group", { name: "สรุปสินค้าคงคลัง" });
     await page.getByRole("button", { name: "ล้างสต๊อก" }).click();
@@ -223,6 +323,7 @@ test("demo inventory workflow stays accurate on desktop and routes stay usable o
     { name: "นำสินค้าออก", heading: "นำสินค้าออก", primary: page.getByRole("button", { name: "บันทึกการนำออก" }) },
     { name: "เปลี่ยนสินค้า", heading: "เปลี่ยนสินค้า", primary: page.getByRole("button", { name: "ตรวจสอบการเปลี่ยน" }) },
     { name: "ประวัติ", heading: "ประวัติการเคลื่อนไหว", primary: page.getByRole("searchbox", { name: "ค้นหาประวัติ" }) },
+    { name: "ใบผลิตออเดอร์", heading: "ใบผลิตออเดอร์", primary: page.getByRole("link", { name: "สร้างใบผลิต" }) },
     { name: "จัดการสินค้า", heading: "จัดการแค็ตตาล็อก", primary: page.getByRole("button", { name: "เพิ่มรุ่น" }) },
   ];
 
@@ -248,6 +349,35 @@ test("demo inventory workflow stays accurate on desktop and routes stay usable o
     }
     if (check.name === "สินค้าคงคลัง") {
       await expectTouchTarget(page, page.getByRole("button", { name: "ล้างสต๊อก" }));
+    }
+    if (check.name === "ใบผลิตออเดอร์") {
+      const createLink = page.getByRole("link", { name: "สร้างใบผลิต" });
+      await expectTouchTarget(page, createLink);
+      await createLink.click();
+      await expect(page.getByRole("heading", { level: 1, name: "สร้างใบผลิตออเดอร์" })).toBeVisible();
+      await page.getByLabel("วันที่กำหนดรับ").fill(localDateAfter(7));
+      await chooseVariant(page.getByRole("region", { name: "รายการสั่งผลิต" }), 1, {
+        model: "Paris", color: "Black", size: "38", quantity: "1",
+      });
+      await page.getByRole("button", { name: "บันทึกใบผลิต" }).click();
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText(/^PO-/);
+      await expect(page.getByRole("list", { name: "รายการในใบผลิตสำหรับมือถือ" })).toBeVisible();
+      await expectNoDocumentOverflow(page);
+
+      await page.getByRole("link", { name: "พิมพ์ใบผลิต" }).click();
+      await expect(page.locator(".production-print-page")).toBeVisible();
+      await expectNoDocumentOverflow(page);
+      await page.emulateMedia({ media: "print" });
+      await expect(page.locator(".mobile-nav")).toBeHidden();
+      await expect(page.locator(".print-controls")).toBeHidden();
+      await expect(page.locator(".production-print-page")).toBeVisible();
+      await page.emulateMedia({ media: "screen" });
+
+      await page.goto("/production-orders");
+      const orderCards = page.getByRole("list", { name: "รายการใบผลิตสำหรับมือถือ" });
+      await expect(orderCards).toBeVisible();
+      await expect(orderCards.getByRole("listitem")).toHaveCount(1);
+      await expectNoDocumentOverflow(page);
     }
     await expectTouchTarget(page, check.primary);
     await expectNoDocumentOverflow(page);

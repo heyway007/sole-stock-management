@@ -29,13 +29,18 @@ describe("release verification configuration", () => {
     expect(css).toMatch(/\.document-actions\s*\{[^}]*bottom:\s*calc\(108px\s*\+\s*env\(safe-area-inset-bottom\)\)/);
   });
 
-  it("mounts one inventory provider above the shell instead of one provider per page", () => {
-    const layout = fs.readFileSync(path.resolve(process.cwd(), "src/app/layout.tsx"), "utf8");
-    expect(layout).toMatch(/<InventoryProvider>\s*<AppShell>\{children\}<\/AppShell>\s*<\/InventoryProvider>/);
+  it("mounts shared inventory and production-order providers once above the shell", () => {
+    const appDirectory = path.resolve(process.cwd(), "src/app");
+    const layout = fs.readFileSync(path.resolve(appDirectory, "layout.tsx"), "utf8");
+    expect(layout).toMatch(/<InventoryProvider>\s*<ProductionOrderProvider>\s*<AppShell>\{children\}<\/AppShell>\s*<\/ProductionOrderProvider>\s*<\/InventoryProvider>/);
+    expect(layout.match(/<InventoryProvider>/g)).toHaveLength(1);
+    expect(layout.match(/<ProductionOrderProvider>/g)).toHaveLength(1);
 
-    for (const route of ["page.tsx", "inventory/page.tsx", "receive/page.tsx", "issue/page.tsx", "exchange/page.tsx", "history/page.tsx", "catalog/page.tsx"]) {
-      const source = fs.readFileSync(path.resolve(process.cwd(), "src/app", route), "utf8");
-      expect(source).not.toMatch(/return\s+<InventoryProvider>/);
+    const routeFiles = fs.readdirSync(appDirectory, { recursive: true, encoding: "utf8" })
+      .filter((file) => file.endsWith("page.tsx"));
+    for (const route of routeFiles) {
+      const source = fs.readFileSync(path.resolve(appDirectory, route), "utf8");
+      expect(source).not.toMatch(/<(?:Inventory|ProductionOrder)Provider>/);
     }
   });
 
