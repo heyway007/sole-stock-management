@@ -216,7 +216,7 @@ button, input, select { font: inherit; }
 .form-field__control:focus-within, .select-control:focus-within { border-color: var(--green-600); box-shadow: 0 0 0 3px rgb(35 123 88 / 12%); }
 .form-field__control.has-error { border-color: #b74435; }
 .form-field__prefix { display: grid; place-items: center; padding-left: 13px; color: #7a857e; }
-.form-field input, .select-control select { width: 100%; min-height: 42px; border: 0; outline: 0; color: var(--ink); background: transparent; padding: 0 12px; }
+.form-field input, .select-control select { width: 100%; min-height: 44px; border: 0; outline: 0; color: var(--ink); background: transparent; padding: 0 12px; }
 .select-control select { cursor: pointer; }
 .form-field input::placeholder { color: #9aa09c; }
 .form-field__error { color: #a63d31; font-size: 0.78rem; }
