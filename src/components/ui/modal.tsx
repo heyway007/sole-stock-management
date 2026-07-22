@@ -10,6 +10,12 @@ interface ModalProps extends PropsWithChildren {
   onClose(): void;
 }
 
+function getFocusableElements(dialog: HTMLElement): HTMLElement[] {
+  return [...dialog.querySelectorAll<HTMLElement>(
+    'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href]',
+  )];
+}
+
 export function Modal({ open, title, description, onClose, children }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
@@ -24,7 +30,8 @@ export function Modal({ open, title, description, onClose, children }: ModalProp
     if (!open) return;
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const dialog = dialogRef.current;
-    dialog?.focus();
+    const firstInteractive = dialog ? getFocusableElements(dialog)[0] : null;
+    (firstInteractive ?? dialog)?.focus();
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
@@ -33,9 +40,7 @@ export function Modal({ open, title, description, onClose, children }: ModalProp
         return;
       }
       if (event.key !== "Tab" || !dialog) return;
-      const focusable = [...dialog.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href]',
-      )];
+      const focusable = getFocusableElements(dialog);
       if (!focusable.length) return;
       const first = focusable[0];
       const last = focusable.at(-1)!;

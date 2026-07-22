@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import { InventoryPageContent } from "@/app/inventory/page";
 import { DemoInventoryRepository } from "@/features/inventory/data/demo-repository";
+import type { InventorySnapshot } from "@/features/inventory/domain/types";
 import { InventoryProvider } from "@/features/inventory/inventory-provider";
 
 class MemoryStorage implements Storage {
@@ -15,6 +16,12 @@ class MemoryStorage implements Storage {
   setItem(key: string, value: string) { this.values.set(key, value); }
 }
 
+class FailingLoadRepository extends DemoInventoryRepository {
+  override async load(): Promise<InventorySnapshot> {
+    throw new Error("load failed");
+  }
+}
+
 function renderInventory() {
   const repository = new DemoInventoryRepository(new MemoryStorage());
   render(<InventoryProvider repository={repository}><InventoryPageContent /></InventoryProvider>);
@@ -23,6 +30,13 @@ function renderInventory() {
 
 describe("InventoryPage", () => {
   afterEach(cleanup);
+
+  it("shows an actionable Thai error when the initial inventory load fails", async () => {
+    render(<InventoryProvider repository={new FailingLoadRepository(new MemoryStorage())}><InventoryPageContent /></InventoryProvider>);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("ไม่สามารถโหลดข้อมูลสต็อกได้ กรุณาลองใหม่อีกครั้ง");
+    expect(screen.queryByText("กำลังโหลดข้อมูลสต็อก…")).not.toBeInTheDocument();
+  });
 
   it("renders desktop headers and matching mobile inventory cards", async () => {
     renderInventory();

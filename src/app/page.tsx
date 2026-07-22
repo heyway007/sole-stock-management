@@ -33,10 +33,17 @@ export function formatDashboardDate(date: Date): string {
   return new Intl.DateTimeFormat("th-TH", { day: "numeric", month: "long", year: "numeric" }).format(date);
 }
 
+export function getDashboardDate(date: Date): { dateTime: string; label: string } {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return { dateTime: `${year}-${month}-${day}`, label: formatDashboardDate(date) };
+}
+
 export function Dashboard() {
   const { snapshot, loading, error } = useInventory();
 
-  if (loading || !snapshot) {
+  if (loading) {
     return <div className="page-state" role="status">กำลังโหลดข้อมูลสต็อก…</div>;
   }
 
@@ -44,11 +51,16 @@ export function Dashboard() {
     return <div className="page-state page-state--error" role="alert">{error}</div>;
   }
 
+  if (!snapshot) {
+    return <div className="page-state" role="status">ยังไม่มีข้อมูลสต็อก</div>;
+  }
+
   const summary = selectDashboardSummary(snapshot);
   const lowStock = selectLowStock(snapshot).slice(0, 5);
   const recentDocuments = [...snapshot.documents]
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
     .slice(0, 5);
+  const today = getDashboardDate(new Date());
   const kpis = [
     { label: "สินค้าคงเหลือ", value: summary.totalOnHand, icon: Boxes, tone: "green" },
     { label: "รับเข้าเดือนนี้", value: summary.receivedThisMonth, icon: ArrowDownToLine, tone: "green" },
@@ -64,7 +76,7 @@ export function Dashboard() {
           <h1>ภาพรวมสต็อก</h1>
           <p>ติดตามสินค้าและจัดการงานประจำวันได้จากที่เดียว</p>
         </div>
-        <time className="header-date" dateTime={new Date().toISOString().slice(0, 10)}>{formatDashboardDate(new Date())}</time>
+        <time className="header-date" dateTime={today.dateTime}>{today.label}</time>
       </header>
 
       <section className="kpi-grid" aria-label="สรุปสต็อก">

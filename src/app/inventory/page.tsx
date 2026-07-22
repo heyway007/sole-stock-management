@@ -72,7 +72,9 @@ export function InventoryPageContent() {
     }
   }
 
-  if (loading || !snapshot) return <div className="page-state" role="status">กำลังโหลดข้อมูลสต็อก…</div>;
+  if (loading) return <div className="page-state" role="status">กำลังโหลดข้อมูลสต็อก…</div>;
+  if (repositoryError && !snapshot) return <div className="page-state page-state--error" role="alert">{repositoryError}</div>;
+  if (!snapshot) return <div className="page-state" role="status">ยังไม่มีข้อมูลสต็อก</div>;
   if (repositoryError && !editingRow) return <div className="page-state page-state--error" role="alert">{repositoryError}</div>;
 
   return (
