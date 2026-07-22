@@ -1,3 +1,3 @@
 export default function Home() {
-  return <main>Shoe Inventory</main>;
+  return <main>ยินดีต้อนรับสู่ SOLE STOCK</main>;
 }

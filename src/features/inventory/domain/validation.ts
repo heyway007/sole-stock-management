@@ -65,6 +65,16 @@ function validateCrossLineRules(input: StockDocumentInput): ValidationError[] {
 
   if (input.type === "EXCHANGE") {
     const sections = new Set(input.lines.map((line) => line.section));
+    for (const [index, line] of input.lines.entries()) {
+      if (!line.section) {
+        errors.push({
+          path: `lines.${index}.section`,
+          code: "INVALID_EXCHANGE",
+          message: thaiMessages.invalidExchange,
+        });
+      }
+    }
+
     if (!sections.has("RETURNED") || !sections.has("REPLACEMENT")) {
       errors.push({
         path: "lines",

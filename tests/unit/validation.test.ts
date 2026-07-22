@@ -73,6 +73,25 @@ describe("validateDocument", () => {
     }
   });
 
+  it("rejects unlabeled exchange lines even when both sections are present", () => {
+    const result = validateDocument({
+      type: "EXCHANGE",
+      effectiveDate: "2026-07-22",
+      lines: [
+        { variantId: "paris-black-38", size: 38, quantity: 1, section: "RETURNED" },
+        { variantId: "paris-black-39", size: 39, quantity: 1, section: "REPLACEMENT" },
+        { variantId: "paris-black-40", size: 40, quantity: 1 },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.errors).toEqual(
+        expect.arrayContaining([expect.objectContaining({ code: "INVALID_EXCHANGE" })]),
+      );
+    }
+  });
+
   it("rejects non-ISO dates and non-positive sizes", () => {
     const result = validateDocument({
       type: "SALE",
