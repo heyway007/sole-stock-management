@@ -363,7 +363,6 @@ export class DemoInventoryRepository implements InventoryRepository {
   }
 
   private current(): InventorySnapshot {
-    if (this.snapshot) return this.snapshot;
     this.snapshot = this.readStoredSnapshot() ?? createSeedSnapshot();
     return this.snapshot;
   }

@@ -90,6 +90,25 @@ describe("DemoInventoryRepository", () => {
     expect(reloaded.colors).toContainEqual(expect.objectContaining({ name: "White" }));
   });
 
+  it("re-reads storage on load after another repository posts a document", async () => {
+    const storage = new MemoryStorage();
+    const reader = new DemoInventoryRepository(storage);
+    const writer = new DemoInventoryRepository(storage);
+    const initial = await reader.load();
+    const variant = initial.variants[0];
+
+    const document = await writer.postDocument({
+      type: "RECEIPT",
+      effectiveDate: "2026-07-22",
+      reference: "PO-20260722-000001",
+      lines: [{ variantId: variant.id, size: variant.size, quantity: 5 }],
+    });
+
+    const refreshed = await reader.load();
+    expect(refreshed.documents).toContainEqual(document);
+    expect(refreshed.balances[variant.id]).toBe(initial.balances[variant.id] + 5);
+  });
+
   it("uses injected random identities for documents and lines", async () => {
     const ids = ["document-random", "line-random"];
     const repository = new DemoInventoryRepository(new MemoryStorage(), { createId: () => ids.shift()! });
