@@ -24,7 +24,7 @@ body {
   margin: 0;
   color: var(--ink);
   background: var(--canvas);
-  font-family: "Noto Sans Thai", "Leelawadee UI", Tahoma, system-ui, sans-serif;
+  font-family: var(--font-kanit), "Noto Sans Thai", "Leelawadee UI", Tahoma, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 

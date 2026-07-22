@@ -1,9 +1,13 @@
 import { render, screen } from "@testing-library/react";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import Home from "@/app/page";
 import { metadata } from "@/app/layout";
 import { DemoInventoryRepository } from "@/features/inventory/data/demo-repository";
 import { InventoryProvider } from "@/features/inventory/inventory-provider";
+
+vi.mock("next/font/google", () => ({
+  Kanit: () => ({ variable: "kanit-variable" }),
+}));
 
 class MemoryStorage implements Storage {
   private readonly values = new Map<string, string>();

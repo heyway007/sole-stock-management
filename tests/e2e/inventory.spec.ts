@@ -81,6 +81,8 @@ test("demo inventory workflow stays accurate on desktop and routes stay usable o
   expect(testInfo.project.use.baseURL).toBe("http://localhost:3100");
   expect([desktopProject, ...mobileProjects]).toContain(testInfo.project.name);
   await resetDemoStorage(page);
+  await expect.poll(() => page.evaluate(() => getComputedStyle(document.body).fontFamily))
+    .toContain("Kanit");
 
   if (testInfo.project.name === desktopProject) {
     const mainNavigation = page.getByRole("navigation", { name: "เมนูหลัก" });
