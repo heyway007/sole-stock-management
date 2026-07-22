@@ -27,6 +27,11 @@ const InventoryContext = createContext<InventoryContextValue | null>(null);
 const LOAD_ERROR = "ไม่สามารถโหลดข้อมูลสต็อกได้ กรุณาลองใหม่อีกครั้ง";
 const SAVE_ERROR = "ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้ง";
 
+function mutationError(error: unknown): Error {
+  const message = error instanceof Error ? error.message : "";
+  return new Error(/[\u0E00-\u0E7F]/.test(message) ? message : SAVE_ERROR);
+}
+
 export function InventoryProvider({ children, factoryOptions, repository }: InventoryProviderProps) {
   if (repository && process.env.NODE_ENV !== "test") {
     throw new Error("The InventoryProvider repository prop is test-only; configure Supabase through the repository factory.");
@@ -74,9 +79,9 @@ export function InventoryProvider({ children, factoryOptions, repository }: Inve
       const result = await mutation(getSelection().repository);
       await refresh();
       return result;
-    } catch {
+    } catch (error) {
       setError(SAVE_ERROR);
-      throw new Error(SAVE_ERROR);
+      throw mutationError(error);
     }
   }, [getSelection, refresh]);
 
