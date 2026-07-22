@@ -26,6 +26,7 @@ interface InventoryProviderProps extends PropsWithChildren {
 const InventoryContext = createContext<InventoryContextValue | null>(null);
 const LOAD_ERROR = "ไม่สามารถโหลดข้อมูลสต็อกได้ กรุณาลองใหม่อีกครั้ง";
 const SAVE_ERROR = "ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้ง";
+const REFRESH_WARNING = "บันทึกข้อมูลสำเร็จ แต่ไม่สามารถโหลดข้อมูลล่าสุดได้ กรุณาลองรีเฟรชอีกครั้ง";
 
 function mutationError(error: unknown): Error {
   const message = error instanceof Error ? error.message : "";
@@ -51,7 +52,7 @@ export function InventoryProvider({ children, factoryOptions, repository }: Inve
     return selectionRef.current;
   }, [factoryOptions, repository]);
 
-  const refresh = useCallback(async () => {
+  const refreshSnapshot = useCallback(async (failureMessage: string) => {
     setLoading(true);
     setError(null);
     try {
@@ -59,11 +60,16 @@ export function InventoryProvider({ children, factoryOptions, repository }: Inve
       setMode(selection.mode);
       setSnapshot(await selection.repository.load());
     } catch {
-      setError(LOAD_ERROR);
+      setError(failureMessage);
     } finally {
       setLoading(false);
     }
   }, [getSelection]);
+
+  const refresh = useCallback(
+    () => refreshSnapshot(LOAD_ERROR),
+    [refreshSnapshot],
+  );
 
   useEffect(() => {
     selectionRef.current = null;
@@ -75,15 +81,16 @@ export function InventoryProvider({ children, factoryOptions, repository }: Inve
   }, [factoryOptions, refresh, repository]);
 
   const runMutation = useCallback(async <T,>(mutation: (repository: InventoryRepository) => Promise<T>): Promise<T> => {
+    let result: T;
     try {
-      const result = await mutation(getSelection().repository);
-      await refresh();
-      return result;
+      result = await mutation(getSelection().repository);
     } catch (error) {
       setError(SAVE_ERROR);
       throw mutationError(error);
     }
-  }, [getSelection, refresh]);
+    await refreshSnapshot(REFRESH_WARNING);
+    return result;
+  }, [getSelection, refreshSnapshot]);
 
   const postDocument = useCallback(
     (input: StockDocumentInput) => runMutation((repository) => repository.postDocument(input)),

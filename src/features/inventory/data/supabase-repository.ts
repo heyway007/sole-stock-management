@@ -56,6 +56,11 @@ interface LineRow {
   note: string | null;
 }
 
+interface PendingPost {
+  requestId: string;
+  inFlight?: Promise<StockDocument>;
+}
+
 export interface InventoryDatabaseRows {
   models: ModelRow[];
   colors: ColorRow[];
@@ -85,6 +90,64 @@ function mapDocument(row: DocumentRow, lines: LineRow[]): StockDocument {
     note: row.note,
     createdAt: row.created_at,
     lines: lines.map(mapLine),
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function snapshotRows(payload: unknown): InventoryDatabaseRows {
+  if (!isRecord(payload)
+    || !Array.isArray(payload.models)
+    || !Array.isArray(payload.colors)
+    || !Array.isArray(payload.variants)
+    || !Array.isArray(payload.balances)
+    || !Array.isArray(payload.documents)
+    || !Array.isArray(payload.lines)) {
+    throw toInventoryRepositoryError(new Error("INVALID_SNAPSHOT_RESPONSE"));
+  }
+  return payload as unknown as InventoryDatabaseRows;
+}
+
+function postedDocument(payload: unknown): StockDocument {
+  if (!isRecord(payload)
+    || typeof payload.id !== "string"
+    || typeof payload.number !== "string"
+    || typeof payload.type !== "string"
+    || typeof payload.effectiveDate !== "string"
+    || typeof payload.reference !== "string"
+    || typeof payload.note !== "string"
+    || typeof payload.createdAt !== "string"
+    || !Array.isArray(payload.lines)) {
+    throw toInventoryRepositoryError(new Error("INVALID_DOCUMENT_RESPONSE"));
+  }
+
+  const lines = payload.lines.map((value) => {
+    if (!isRecord(value)
+      || typeof value.id !== "string"
+      || typeof value.variantId !== "string"
+      || typeof value.delta !== "number") {
+      throw toInventoryRepositoryError(new Error("INVALID_DOCUMENT_RESPONSE"));
+    }
+    return {
+      id: value.id,
+      variantId: value.variantId,
+      delta: value.delta,
+      ...(value.section === "RETURNED" || value.section === "REPLACEMENT" ? { section: value.section } : {}),
+      ...(typeof value.note === "string" && value.note ? { note: value.note } : {}),
+    } satisfies StockDocumentLine;
+  });
+
+  return {
+    id: payload.id,
+    number: payload.number,
+    type: payload.type as MovementType,
+    effectiveDate: payload.effectiveDate,
+    reference: payload.reference,
+    note: payload.note,
+    createdAt: payload.createdAt,
+    lines,
   };
 }
 
@@ -173,55 +236,53 @@ function documentCommand(input: StockDocumentInput): Json {
 
 export class SupabaseInventoryRepository implements InventoryRepository {
   private readonly client: InventorySupabaseClient;
+  private readonly pendingPosts = new Map<string, PendingPost>();
 
-  constructor(url: string, anonymousKey: string, client?: InventorySupabaseClient) {
+  constructor(
+    url: string,
+    anonymousKey: string,
+    client?: InventorySupabaseClient,
+    private readonly createRequestId: () => string = () => globalThis.crypto.randomUUID(),
+  ) {
     this.client = client ?? createInventorySupabaseClient(url, anonymousKey);
   }
 
   async load(): Promise<InventorySnapshot> {
-    const [models, colors, variants, balances, documents, lines] = await Promise.all([
-      this.client.from("shoe_models").select("id,name,active").order("name"),
-      this.client.from("colors").select("id,name,active").order("name"),
-      this.client.from("product_variants").select("id,model_id,color_id,size,low_stock_threshold,active")
-        .order("model_id").order("color_id").order("size"),
-      this.client.from("inventory_balances").select("variant_id,quantity"),
-      this.client.from("stock_documents").select("id,document_number,movement_type,effective_date,reference,note,created_at")
-        .order("created_at"),
-      this.client.from("stock_document_lines").select("id,document_id,variant_id,delta,exchange_section,note")
-        .order("document_id").order("line_number"),
-    ]);
-
-    for (const result of [models, colors, variants, balances, documents, lines]) throwFor(result.error);
-
-    return mapInventorySnapshot({
-      models: models.data ?? [],
-      colors: colors.data ?? [],
-      variants: variants.data ?? [],
-      balances: balances.data ?? [],
-      documents: documents.data ?? [],
-      lines: lines.data ?? [],
-    });
+    const result = await this.client.rpc("get_inventory_snapshot");
+    throwFor(result.error);
+    return mapInventorySnapshot(snapshotRows(result.data));
   }
 
   async postDocument(input: StockDocumentInput): Promise<StockDocument> {
-    const posted = await this.client.rpc("post_stock_document", { command: documentCommand(input) });
-    throwFor(posted.error);
-    if (typeof posted.data !== "string") throw toInventoryRepositoryError(new Error("INVALID_DOCUMENT_ID"));
+    const baseCommand = documentCommand(input);
+    const fingerprint = JSON.stringify(baseCommand);
+    let pending = this.pendingPosts.get(fingerprint);
+    if (pending?.inFlight) return pending.inFlight;
+    if (!pending) {
+      pending = { requestId: this.createRequestId() };
+      this.pendingPosts.set(fingerprint, pending);
+    }
 
-    const [document, lines] = await Promise.all([
-      this.client.from("stock_documents")
-        .select("id,document_number,movement_type,effective_date,reference,note,created_at")
-        .eq("id", posted.data)
-        .single(),
-      this.client.from("stock_document_lines")
-        .select("id,document_id,variant_id,delta,exchange_section,note")
-        .eq("document_id", posted.data)
-        .order("line_number"),
-    ]);
-    throwFor(document.error);
-    throwFor(lines.error);
-    if (!document.data) throw toInventoryRepositoryError(new Error("DOCUMENT_NOT_FOUND"));
-    return mapDocument(document.data, lines.data ?? []);
+    const command = isRecord(baseCommand)
+      ? { ...baseCommand, requestId: pending.requestId }
+      : baseCommand;
+    const attempt = this.postCommand(command);
+    pending.inFlight = attempt;
+
+    try {
+      const document = await attempt;
+      this.pendingPosts.delete(fingerprint);
+      return document;
+    } catch (error) {
+      pending.inFlight = undefined;
+      throw error;
+    }
+  }
+
+  private async postCommand(command: Json): Promise<StockDocument> {
+    const result = await this.client.rpc("post_stock_document", { command });
+    throwFor(result.error);
+    return postedDocument(result.data);
   }
 
   async saveLowStockThreshold(variantId: string, threshold: number): Promise<void> {

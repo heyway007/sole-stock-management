@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { DemoInventoryRepository } from "@/features/inventory/data/demo-repository";
 import type { StockDocumentInput } from "@/features/inventory/domain/types";
@@ -36,6 +37,16 @@ class FailingDemoRepository extends DemoInventoryRepository {
   }
 }
 
+class ConfirmedPostRefreshFailsRepository extends DemoInventoryRepository {
+  private loadCount = 0;
+
+  override async load() {
+    this.loadCount += 1;
+    if (this.loadCount > 1) throw new Error("refresh failed");
+    return super.load();
+  }
+}
+
 function InventoryState() {
   const inventory = useInventory();
   const variant = inventory.snapshot?.variants[0];
@@ -51,6 +62,24 @@ function InventoryState() {
       effectiveDate: "2026-07-22",
       lines: [{ variantId: variant.id, size: variant.size, quantity: 2 }],
     }).catch(() => undefined)}>รับสินค้า</button>}
+  </>;
+}
+
+function ConfirmedPostState() {
+  const inventory = useInventory();
+  const [result, setResult] = useState("-");
+  const variant = inventory.snapshot?.variants[0];
+  const quantity = variant ? inventory.snapshot?.balances[variant.id] : null;
+
+  return <>
+    <p>จำนวน: {quantity ?? "-"}</p>
+    <p>ผลลัพธ์: {result}</p>
+    {inventory.error && <p role="alert">{inventory.error}</p>}
+    {variant && <button onClick={() => void inventory.postDocument({
+      type: "RECEIPT",
+      effectiveDate: "2026-07-22",
+      lines: [{ variantId: variant.id, size: variant.size, quantity: 2 }],
+    }).then((document) => setResult(document.number)).catch(() => setResult("rejected"))}>รับสินค้าแบบยืนยันผล</button>}
   </>;
 }
 
@@ -73,6 +102,18 @@ describe("InventoryProvider", () => {
     await screen.findByText("จำนวน: 2");
     fireEvent.click(screen.getByRole("button", { name: "รับสินค้า" }));
     expect(await screen.findByText("จำนวน: 4")).toBeInTheDocument();
+  });
+
+  it("returns a confirmed post when the following refresh fails and shows a Thai refresh warning", async () => {
+    const repository = new ConfirmedPostRefreshFailsRepository(new MemoryStorage());
+    render(<InventoryProvider repository={repository}><ConfirmedPostState /></InventoryProvider>);
+
+    await screen.findByText("จำนวน: 2");
+    fireEvent.click(screen.getByRole("button", { name: "รับสินค้าแบบยืนยันผล" }));
+
+    expect(await screen.findByText("ผลลัพธ์: STK-20260722-0001")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("บันทึกข้อมูลสำเร็จ แต่ไม่สามารถโหลดข้อมูลล่าสุดได้ กรุณาลองรีเฟรชอีกครั้ง");
+    expect(screen.getByText("จำนวน: 2")).toBeInTheDocument();
   });
 
   it("keeps the existing snapshot and presents Thai action copy after a repository error", async () => {

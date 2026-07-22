@@ -1,6 +1,9 @@
 -- SECURITY WARNING: Version one is a shared, anonymous, single-tenant client.
--- Replace every shared_v1_anon_* policy with authenticated tenant/role policies
+-- Replace every shared_v1_open_* policy with authenticated tenant/role policies
 -- before storing sensitive data or deploying this schema for multiple tenants.
+-- Apply this migration as the trusted Supabase `postgres` migration owner. The
+-- SECURITY DEFINER posting function is an integrity boundary, not authorization:
+-- it must remain owned by `postgres`, which also owns the protected ledger tables.
 
 create extension if not exists pgcrypto;
 
@@ -48,6 +51,7 @@ create table public.inventory_balances (
 
 create table public.stock_documents (
   id uuid primary key default gen_random_uuid(),
+  client_request_id uuid not null unique,
   document_number text not null unique,
   movement_type text not null constraint stock_documents_movement_type_valid
     check (movement_type in ('RECEIPT', 'SALE', 'DAMAGE', 'ADJUSTMENT', 'EXCHANGE')),
@@ -87,7 +91,7 @@ create or replace function public.set_inventory_updated_at()
 returns trigger
 language plpgsql
 security invoker
-set search_path = public
+set search_path = pg_catalog, public
 as $$
 begin
   new.updated_at := now();
@@ -115,7 +119,7 @@ create or replace function public.validate_stock_document_line()
 returns trigger
 language plpgsql
 security invoker
-set search_path = public
+set search_path = pg_catalog, public
 as $$
 declare
   document_movement_type text;
@@ -146,18 +150,100 @@ create trigger stock_document_lines_validate_movement
 before insert or update on public.stock_document_lines
 for each row execute function public.validate_stock_document_line();
 
-create or replace function public.post_stock_document(command jsonb)
-returns uuid
-language plpgsql
+create or replace function public.get_inventory_snapshot()
+returns jsonb
+language sql
+stable
 security invoker
-set search_path = public, pg_temp
+set search_path = pg_catalog, public
+as $$
+  select pg_catalog.jsonb_build_object(
+    'models', coalesce((
+      select pg_catalog.jsonb_agg(
+        pg_catalog.jsonb_build_object(
+          'id', model.id,
+          'name', model.name,
+          'active', model.active
+        ) order by pg_catalog.lower(model.name), model.id
+      )
+      from public.shoe_models model
+    ), '[]'::jsonb),
+    'colors', coalesce((
+      select pg_catalog.jsonb_agg(
+        pg_catalog.jsonb_build_object(
+          'id', color.id,
+          'name', color.name,
+          'active', color.active
+        ) order by pg_catalog.lower(color.name), color.id
+      )
+      from public.colors color
+    ), '[]'::jsonb),
+    'variants', coalesce((
+      select pg_catalog.jsonb_agg(
+        pg_catalog.jsonb_build_object(
+          'id', variant.id,
+          'model_id', variant.model_id,
+          'color_id', variant.color_id,
+          'size', variant.size,
+          'low_stock_threshold', variant.low_stock_threshold,
+          'active', variant.active
+        ) order by variant.model_id, variant.color_id, variant.size, variant.id
+      )
+      from public.product_variants variant
+    ), '[]'::jsonb),
+    'balances', coalesce((
+      select pg_catalog.jsonb_agg(
+        pg_catalog.jsonb_build_object(
+          'variant_id', balance.variant_id,
+          'quantity', balance.quantity
+        ) order by balance.variant_id
+      )
+      from public.inventory_balances balance
+    ), '[]'::jsonb),
+    'documents', coalesce((
+      select pg_catalog.jsonb_agg(
+        pg_catalog.jsonb_build_object(
+          'id', document.id,
+          'document_number', document.document_number,
+          'movement_type', document.movement_type,
+          'effective_date', document.effective_date,
+          'reference', document.reference,
+          'note', document.note,
+          'created_at', document.created_at
+        ) order by document.created_at, document.document_number, document.id
+      )
+      from public.stock_documents document
+    ), '[]'::jsonb),
+    'lines', coalesce((
+      select pg_catalog.jsonb_agg(
+        pg_catalog.jsonb_build_object(
+          'id', line.id,
+          'document_id', line.document_id,
+          'variant_id', line.variant_id,
+          'delta', line.delta,
+          'exchange_section', line.exchange_section,
+          'note', line.note
+        ) order by line.document_id, line.line_number, line.id
+      )
+      from public.stock_document_lines line
+    ), '[]'::jsonb)
+  );
+$$;
+
+create or replace function public.post_stock_document(command jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public
 as $$
 declare
+  request_id uuid;
   movement text;
   effective_on date;
-  new_document_id uuid := gen_random_uuid();
+  new_document_id uuid;
   next_document_sequence bigint;
   new_document_number text;
+  posted_document jsonb;
   line jsonb;
   line_variant_id uuid;
   line_variant_text text;
@@ -169,6 +255,26 @@ begin
   if command is null or jsonb_typeof(command) is distinct from 'object' then
     raise exception using errcode = 'P0001', message = 'INVALID_DOCUMENT';
   end if;
+
+  if jsonb_typeof(command -> 'requestId') is distinct from 'string'
+    or command ->> 'requestId' !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
+    raise exception using errcode = 'P0001', message = 'INVALID_DOCUMENT';
+  end if;
+  request_id := (command ->> 'requestId')::uuid;
+
+  -- One transaction-scoped lock serializes all attempts carrying the same
+  -- client request UUID. A hash collision only adds harmless serialization.
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended(request_id::text, 0)
+  );
+
+  select document.id
+    into new_document_id
+    from public.stock_documents document
+    where document.client_request_id = request_id;
+
+  if new_document_id is null then
+  new_document_id := pg_catalog.gen_random_uuid();
 
   if jsonb_typeof(command -> 'type') is distinct from 'string'
     or command ->> 'type' not in ('RECEIPT', 'SALE', 'DAMAGE', 'ADJUSTMENT', 'EXCHANGE') then
@@ -340,9 +446,10 @@ begin
   );
 
   insert into public.stock_documents (
-    id, document_number, movement_type, effective_date, reference, note
+    id, client_request_id, document_number, movement_type, effective_date, reference, note
   ) values (
     new_document_id,
+    request_id,
     new_document_number,
     movement,
     effective_on,
@@ -400,7 +507,41 @@ begin
     set quantity = excluded.quantity,
         updated_at = now();
 
-  return new_document_id;
+  end if;
+
+  select pg_catalog.jsonb_build_object(
+    'id', document.id,
+    'number', document.document_number,
+    'type', document.movement_type,
+    'effectiveDate', document.effective_date,
+    'reference', document.reference,
+    'note', document.note,
+    'createdAt', document.created_at,
+    'lines', coalesce((
+      select pg_catalog.jsonb_agg(
+        pg_catalog.jsonb_strip_nulls(
+          pg_catalog.jsonb_build_object(
+            'id', line.id,
+            'variantId', line.variant_id,
+            'delta', line.delta,
+            'section', line.exchange_section,
+            'note', line.note
+          )
+        ) order by line.line_number, line.id
+      )
+      from public.stock_document_lines line
+      where line.document_id = document.id
+    ), '[]'::jsonb)
+  )
+    into posted_document
+    from public.stock_documents document
+    where document.id = new_document_id;
+
+  if posted_document is null then
+    raise exception using errcode = 'P0001', message = 'DOCUMENT_NOT_FOUND';
+  end if;
+
+  return posted_document;
 end;
 $$;
 
@@ -411,63 +552,89 @@ alter table public.inventory_balances enable row level security;
 alter table public.stock_documents enable row level security;
 alter table public.stock_document_lines enable row level security;
 
-create policy shared_v1_anon_read_shoe_models on public.shoe_models for select to anon using (true);
-create policy shared_v1_anon_insert_shoe_models on public.shoe_models for insert to anon with check (true);
-create policy shared_v1_anon_update_shoe_models on public.shoe_models for update to anon using (true) with check (true);
-create policy shared_v1_anon_read_colors on public.colors for select to anon using (true);
-create policy shared_v1_anon_insert_colors on public.colors for insert to anon with check (true);
-create policy shared_v1_anon_update_colors on public.colors for update to anon using (true) with check (true);
-create policy shared_v1_anon_read_product_variants on public.product_variants for select to anon using (true);
-create policy shared_v1_anon_update_product_variants on public.product_variants for update to anon using (true) with check (true);
-create policy shared_v1_anon_read_inventory_balances on public.inventory_balances for select to anon using (true);
-create policy shared_v1_anon_insert_inventory_balances on public.inventory_balances for insert to anon with check (true);
-create policy shared_v1_anon_update_inventory_balances on public.inventory_balances for update to anon using (true) with check (true);
-create policy shared_v1_anon_read_stock_documents on public.stock_documents for select to anon using (true);
-create policy shared_v1_anon_insert_stock_documents on public.stock_documents for insert to anon with check (true);
-create policy shared_v1_anon_read_stock_document_lines on public.stock_document_lines for select to anon using (true);
-create policy shared_v1_anon_insert_stock_document_lines on public.stock_document_lines for insert to anon with check (true);
+create policy shared_v1_open_read_shoe_models on public.shoe_models
+  for select to anon, authenticated using (true);
+create policy shared_v1_open_insert_shoe_models on public.shoe_models
+  for insert to anon, authenticated with check (true);
+create policy shared_v1_open_update_shoe_models on public.shoe_models
+  for update to anon, authenticated using (true) with check (true);
+create policy shared_v1_open_read_colors on public.colors
+  for select to anon, authenticated using (true);
+create policy shared_v1_open_insert_colors on public.colors
+  for insert to anon, authenticated with check (true);
+create policy shared_v1_open_update_colors on public.colors
+  for update to anon, authenticated using (true) with check (true);
+create policy shared_v1_open_read_product_variants on public.product_variants
+  for select to anon, authenticated using (true);
+create policy shared_v1_open_update_product_variants on public.product_variants
+  for update to anon, authenticated using (true) with check (true);
+create policy shared_v1_open_read_inventory_balances on public.inventory_balances
+  for select to anon, authenticated using (true);
+create policy shared_v1_open_read_stock_documents on public.stock_documents
+  for select to anon, authenticated using (true);
+create policy shared_v1_open_read_stock_document_lines on public.stock_document_lines
+  for select to anon, authenticated using (true);
 
-comment on policy shared_v1_anon_read_shoe_models on public.shoe_models is
-  'WARNING: shared anonymous v1 access; replace with authenticated tenant policies before sensitive or multi-tenant use.';
-comment on policy shared_v1_anon_insert_shoe_models on public.shoe_models is
-  'WARNING: shared anonymous v1 access; replace with authenticated tenant policies before sensitive or multi-tenant use.';
-comment on policy shared_v1_anon_update_shoe_models on public.shoe_models is
-  'WARNING: shared anonymous v1 access; replace with authenticated tenant policies before sensitive or multi-tenant use.';
-comment on policy shared_v1_anon_read_colors on public.colors is
-  'WARNING: shared anonymous v1 access; replace with authenticated tenant policies before sensitive or multi-tenant use.';
-comment on policy shared_v1_anon_insert_colors on public.colors is
-  'WARNING: shared anonymous v1 access; replace with authenticated tenant policies before sensitive or multi-tenant use.';
-comment on policy shared_v1_anon_update_colors on public.colors is
-  'WARNING: shared anonymous v1 access; replace with authenticated tenant policies before sensitive or multi-tenant use.';
-comment on policy shared_v1_anon_read_product_variants on public.product_variants is
-  'WARNING: shared anonymous v1 access; replace with authenticated tenant policies before sensitive or multi-tenant use.';
-comment on policy shared_v1_anon_update_product_variants on public.product_variants is
-  'WARNING: shared anonymous v1 access; replace with authenticated tenant policies before sensitive or multi-tenant use.';
-comment on policy shared_v1_anon_read_inventory_balances on public.inventory_balances is
-  'WARNING: shared anonymous v1 access; replace with authenticated tenant policies before sensitive or multi-tenant use.';
-comment on policy shared_v1_anon_insert_inventory_balances on public.inventory_balances is
-  'WARNING: shared anonymous v1 access; replace with authenticated tenant policies before sensitive or multi-tenant use.';
-comment on policy shared_v1_anon_update_inventory_balances on public.inventory_balances is
-  'WARNING: shared anonymous v1 access; replace with authenticated tenant policies before sensitive or multi-tenant use.';
-comment on policy shared_v1_anon_read_stock_documents on public.stock_documents is
-  'WARNING: shared anonymous v1 access; replace with authenticated tenant policies before sensitive or multi-tenant use.';
-comment on policy shared_v1_anon_insert_stock_documents on public.stock_documents is
-  'WARNING: shared anonymous v1 access; replace with authenticated tenant policies before sensitive or multi-tenant use.';
-comment on policy shared_v1_anon_read_stock_document_lines on public.stock_document_lines is
-  'WARNING: shared anonymous v1 access; replace with authenticated tenant policies before sensitive or multi-tenant use.';
-comment on policy shared_v1_anon_insert_stock_document_lines on public.stock_document_lines is
-  'WARNING: shared anonymous v1 access; replace with authenticated tenant policies before sensitive or multi-tenant use.';
+comment on policy shared_v1_open_read_shoe_models on public.shoe_models is
+  'WARNING: fully open no-login v1 access; replace before sensitive or multi-tenant use.';
+comment on policy shared_v1_open_insert_shoe_models on public.shoe_models is
+  'WARNING: fully open no-login v1 access; replace before sensitive or multi-tenant use.';
+comment on policy shared_v1_open_update_shoe_models on public.shoe_models is
+  'WARNING: fully open no-login v1 access; replace before sensitive or multi-tenant use.';
+comment on policy shared_v1_open_read_colors on public.colors is
+  'WARNING: fully open no-login v1 access; replace before sensitive or multi-tenant use.';
+comment on policy shared_v1_open_insert_colors on public.colors is
+  'WARNING: fully open no-login v1 access; replace before sensitive or multi-tenant use.';
+comment on policy shared_v1_open_update_colors on public.colors is
+  'WARNING: fully open no-login v1 access; replace before sensitive or multi-tenant use.';
+comment on policy shared_v1_open_read_product_variants on public.product_variants is
+  'WARNING: fully open no-login v1 access; replace before sensitive or multi-tenant use.';
+comment on policy shared_v1_open_update_product_variants on public.product_variants is
+  'WARNING: fully open no-login v1 access; replace before sensitive or multi-tenant use.';
+comment on policy shared_v1_open_read_inventory_balances on public.inventory_balances is
+  'WARNING: fully open no-login v1 read access; writes are allowed only through the integrity RPC.';
+comment on policy shared_v1_open_read_stock_documents on public.stock_documents is
+  'WARNING: fully open no-login v1 read access; writes are allowed only through the integrity RPC.';
+comment on policy shared_v1_open_read_stock_document_lines on public.stock_document_lines is
+  'WARNING: fully open no-login v1 read access; writes are allowed only through the integrity RPC.';
 
-grant usage on schema public to anon;
-grant select, insert, update on public.shoe_models, public.colors to anon;
-grant select, update on public.product_variants to anon;
-grant select, insert, update on public.inventory_balances to anon;
-grant select, insert on public.stock_documents, public.stock_document_lines to anon;
-grant usage, select on sequence public.inventory_document_number_seq to anon;
-revoke all on function public.post_stock_document(jsonb) from public;
-grant execute on function public.post_stock_document(jsonb) to anon;
-revoke all on function public.set_inventory_updated_at() from public, anon;
-revoke all on function public.validate_stock_document_line() from public, anon;
+-- SECURITY DEFINER assumptions are explicit: Supabase migrations run as the
+-- trusted postgres role, which owns the function, protected tables, and sequence.
+alter table public.inventory_balances owner to postgres;
+alter table public.stock_documents owner to postgres;
+alter table public.stock_document_lines owner to postgres;
+alter sequence public.inventory_document_number_seq owner to postgres;
+alter function public.set_inventory_updated_at() owner to postgres;
+alter function public.validate_stock_document_line() owner to postgres;
+alter function public.get_inventory_snapshot() owner to postgres;
+alter function public.post_stock_document(jsonb) owner to postgres;
+alter default privileges for role postgres in schema public revoke execute on functions from public;
+
+revoke create on schema public from public, anon, authenticated;
+grant usage on schema public to anon, authenticated;
+
+grant select on public.shoe_models, public.colors, public.product_variants,
+  public.inventory_balances, public.stock_documents, public.stock_document_lines
+  to anon, authenticated;
+grant insert (name), update (name, active) on public.shoe_models to anon, authenticated;
+grant insert (name), update (name, active) on public.colors to anon, authenticated;
+grant update (low_stock_threshold) on public.product_variants to anon, authenticated;
+
+revoke insert, update, delete on public.inventory_balances,
+  public.stock_documents, public.stock_document_lines from public, anon, authenticated;
+revoke all on sequence public.inventory_document_number_seq from public, anon, authenticated;
+
+revoke all on function public.set_inventory_updated_at() from public, anon, authenticated;
+revoke all on function public.validate_stock_document_line() from public, anon, authenticated;
+revoke all on function public.get_inventory_snapshot() from public, anon, authenticated;
+revoke all on function public.post_stock_document(jsonb) from public, anon, authenticated;
+grant execute on function public.get_inventory_snapshot() to anon, authenticated;
+grant execute on function public.post_stock_document(jsonb) to anon, authenticated;
+
+comment on function public.get_inventory_snapshot() is
+  'Fully open no-login v1 read RPC returning one coherent, uncapped inventory snapshot.';
+comment on function public.post_stock_document(jsonb) is
+  'Fully open no-login v1 write RPC. SECURITY DEFINER is only an internal integrity boundary; keep trusted postgres ownership and the pinned search_path.';
 
 insert into public.shoe_models (name)
 values ('Paris'), ('Castor'), ('Weave')

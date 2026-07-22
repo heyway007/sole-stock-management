@@ -43,6 +43,7 @@ type InventoryBalanceRow = {
 
 type StockDocumentRow = {
   id: string;
+  client_request_id: string;
   document_number: string;
   movement_type: "RECEIPT" | "SALE" | "DAMAGE" | "ADJUSTMENT" | "EXCHANGE";
   effective_date: string;
@@ -109,6 +110,7 @@ export interface InventoryDatabase {
         StockDocumentRow,
         {
           id?: string;
+          client_request_id: string;
           document_number?: string;
           movement_type: StockDocumentRow["movement_type"];
           effective_date: string;
@@ -135,9 +137,13 @@ export interface InventoryDatabase {
     };
     Views: { [_ in never]: never };
     Functions: {
+      get_inventory_snapshot: {
+        Args: never;
+        Returns: Json;
+      };
       post_stock_document: {
         Args: { command: Json };
-        Returns: string;
+        Returns: Json;
       };
     };
     Enums: { [_ in never]: never };
