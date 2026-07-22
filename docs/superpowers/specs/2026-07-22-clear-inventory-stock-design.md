@@ -42,7 +42,7 @@ The demo repository performs the clear inside its existing mutation lock, derive
 
 ## Supabase Transaction
 
-Add migration `supabase/migrations/202607220002_clear_inventory_stock.sql` with a `security definer` RPC named `clear_inventory_stock(command jsonb)`.
+Add migration `supabase/migrations/202607220003_clear_inventory_stock.sql` with a `security definer` RPC named `clear_inventory_stock(command jsonb)`.
 
 The command contains a UUID `requestId` and ISO `effectiveDate`. The RPC will:
 
