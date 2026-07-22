@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DemoInventoryRepository } from "@/features/inventory/data/demo-repository";
 import { createInventoryRepository, selectInventoryRepository } from "@/features/inventory/data/repository-factory";
+import { SupabaseInventoryRepository } from "@/features/inventory/data/supabase-repository";
 
 class MemoryStorage implements Storage {
   private readonly values = new Map<string, string>();
@@ -35,11 +36,11 @@ describe("createInventoryRepository", () => {
     expect(selection.repository).toBeInstanceOf(DemoInventoryRepository);
   });
 
-  it("stays in demo mode when full config has no Supabase adapter", () => {
+  it("selects the concrete Supabase adapter when all three config values are present", () => {
     const selection = selectInventoryRepository({ environment: supabaseEnvironment, storage: new MemoryStorage() });
 
-    expect(selection.mode).toBe("demo");
-    expect(selection.repository).toBeInstanceOf(DemoInventoryRepository);
+    expect(selection.mode).toBe("supabase");
+    expect(selection.repository).toBeInstanceOf(SupabaseInventoryRepository);
   });
 
   it("selects the injected Supabase adapter only with all three config values", () => {

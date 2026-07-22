@@ -1,5 +1,6 @@
 import { DemoInventoryRepository } from "./demo-repository";
 import type { InventoryRepository } from "./inventory-repository";
+import { SupabaseInventoryRepository } from "./supabase-repository";
 
 export interface RepositoryFactoryOptions {
   environment?: Record<string, string | undefined>;
@@ -32,6 +33,14 @@ export function selectInventoryRepository(options: RepositoryFactoryOptions = {}
     if (options.createSupabaseRepository) {
       return { repository: options.createSupabaseRepository(), mode: "supabase" };
     }
+    const environment = environmentFor(options);
+    return {
+      repository: new SupabaseInventoryRepository(
+        environment.NEXT_PUBLIC_SUPABASE_URL!,
+        environment.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      ),
+      mode: "supabase",
+    };
   }
 
   const storage = options.storage ?? (typeof window === "undefined" ? undefined : window.localStorage);
