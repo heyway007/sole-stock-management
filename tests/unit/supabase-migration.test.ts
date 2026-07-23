@@ -11,6 +11,10 @@ const sizeMigrationPath = resolve(
   process.cwd(),
   "supabase/migrations/202607230005_text_size_profiles.sql",
 );
+const pricingMigrationPath = resolve(
+  process.cwd(),
+  "supabase/migrations/202607230006_production_order_pricing.sql",
+);
 
 describe("Supabase inventory migration ACL", () => {
   it("revokes broad catalog writes before granting only the required columns", () => {
@@ -156,6 +160,26 @@ describe("Supabase text-size migration", () => {
     expect(sizeMigration).toContain("('weave', '45')");
     expect(sizeMigration).not.toMatch(
       /delete\s+from\s+public\.(?:product_variants|inventory_balances|stock_documents|production_orders)/,
+    );
+  });
+});
+
+describe("Supabase production-order pricing migration", () => {
+  it("adds nullable positive prices and replaces the JSON/save contracts", () => {
+    const pricingMigration = readFileSync(pricingMigrationPath, "utf8")
+      .replaceAll("\r\n", "\n")
+      .toLocaleLowerCase("en-US");
+
+    expect(pricingMigration).toContain("add column unit_price numeric(12,2)");
+    expect(pricingMigration).toContain(
+      "check (unit_price is null or unit_price > 0)",
+    );
+    expect(pricingMigration).toContain("'unitprice', line.unit_price");
+    expect(pricingMigration).toContain(
+      "pg_catalog.jsonb_typeof(line -> 'unitprice') is distinct from 'number'",
+    );
+    expect(pricingMigration).not.toMatch(
+      /delete\s+from\s+public\.production_orders/,
     );
   });
 });

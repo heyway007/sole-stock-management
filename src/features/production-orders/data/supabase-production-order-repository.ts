@@ -6,6 +6,7 @@ import {
 } from "@/lib/supabase";
 import type { StockDocument, StockDocumentLine } from "@/features/inventory/domain/types";
 import { normalizeSizeLabel } from "@/features/inventory/domain/size-label";
+import { amountToMinor } from "../domain/money";
 import type {
   ProductionOrder,
   ProductionOrderInput,
@@ -50,6 +51,7 @@ function isStatus(value: unknown): value is ProductionOrderStatus {
 
 function mappedLine(value: unknown): ProductionOrderLine {
   const size = isRecord(value) ? normalizeSizeLabel(value.size) : null;
+  const unitPrice = isRecord(value) ? value.unitPrice : undefined;
   if (!isRecord(value)
     || !isNonEmptyString(value.id)
     || !isNonEmptyString(value.variantId)
@@ -63,7 +65,9 @@ function mappedLine(value: unknown): ProductionOrderLine {
     || size !== value.size
     || typeof value.quantity !== "number"
     || !Number.isInteger(value.quantity)
-    || value.quantity < 1) {
+    || value.quantity < 1
+    || (unitPrice !== null
+      && (typeof unitPrice !== "number" || amountToMinor(unitPrice) === null))) {
     throw new Error("ข้อมูลใบผลิตจากเซิร์ฟเวอร์ไม่ถูกต้อง");
   }
   return {
@@ -74,6 +78,7 @@ function mappedLine(value: unknown): ProductionOrderLine {
     colorName: value.colorName,
     size,
     quantity: value.quantity,
+    unitPrice,
   };
 }
 
@@ -206,6 +211,7 @@ function commandFor(input: ProductionOrderInput): Json {
     lines: input.lines.map((line) => ({
       variantId: line.variantId,
       quantity: line.quantity,
+      unitPrice: line.unitPrice,
     })),
   };
 }

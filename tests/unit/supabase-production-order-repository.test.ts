@@ -54,6 +54,7 @@ const openOrder = {
     colorName: "Black",
     size: "M",
     quantity: 4,
+    unitPrice: 327.5,
   }],
 } satisfies Json;
 
@@ -102,7 +103,7 @@ describe("SupabaseProductionOrderRepository", () => {
       orderDate: "2026-07-22",
       expectedDate: "2026-08-05",
       note: "รอบแรก",
-      lines: [{ variantId: "variant-1", quantity: 4 }],
+      lines: [{ variantId: "variant-1", quantity: 4, unitPrice: 327.5 }],
     })).resolves.toMatchObject({ status: "OPEN" });
     await expect(repository.cancel("order-1")).resolves.toMatchObject({ status: "CANCELLED" });
     await expect(repository.receive("order-1", "2026-07-22")).resolves.toMatchObject({
@@ -114,7 +115,13 @@ describe("SupabaseProductionOrderRepository", () => {
       { name: "get_production_orders", args: undefined },
       {
         name: "save_production_order",
-        args: { command: expect.objectContaining({ requestId: "request-create", orderDate: "2026-07-22" }) },
+        args: {
+          command: expect.objectContaining({
+            requestId: "request-create",
+            orderDate: "2026-07-22",
+            lines: [{ variantId: "variant-1", quantity: 4, unitPrice: 327.5 }],
+          }),
+        },
       },
       { name: "cancel_production_order", args: { command: { orderId: "order-1" } } },
       {
@@ -142,7 +149,7 @@ describe("SupabaseProductionOrderRepository", () => {
       orderDate: "2026-07-22",
       expectedDate: "2026-08-05",
       note: "รอบแรก",
-      lines: [{ variantId: "variant-1", quantity: 4 }],
+      lines: [{ variantId: "variant-1", quantity: 4, unitPrice: 327.5 }],
     };
 
     await expect(repository.save(input)).rejects.toThrow("ไม่สามารถบันทึกข้อมูลได้");
@@ -197,5 +204,37 @@ describe("SupabaseProductionOrderRepository", () => {
     await expect(repository.load()).rejects.toThrow(
       "ข้อมูลใบผลิตจากเซิร์ฟเวอร์ไม่ถูกต้อง",
     );
+  });
+
+  it("maps legacy null prices and rejects malformed prices", async () => {
+    const legacyClient = new ContractClient();
+    legacyClient.rpcResults.push({
+      data: [{ ...openOrder, lines: [{ ...openOrder.lines[0], unitPrice: null }] }],
+      error: null,
+    });
+    const legacyRepository = new SupabaseProductionOrderRepository(
+      "https://example.supabase.co",
+      "anon",
+      asClient(legacyClient),
+    );
+    await expect(legacyRepository.load()).resolves.toMatchObject([
+      { lines: [{ unitPrice: null }] },
+    ]);
+
+    for (const unitPrice of [0, -1, 1.234]) {
+      const client = new ContractClient();
+      client.rpcResults.push({
+        data: [{ ...openOrder, lines: [{ ...openOrder.lines[0], unitPrice }] }],
+        error: null,
+      });
+      const repository = new SupabaseProductionOrderRepository(
+        "https://example.supabase.co",
+        "anon",
+        asClient(client),
+      );
+      await expect(repository.load()).rejects.toThrow(
+        "ข้อมูลใบผลิตจากเซิร์ฟเวอร์ไม่ถูกต้อง",
+      );
+    }
   });
 });
