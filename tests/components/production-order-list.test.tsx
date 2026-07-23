@@ -35,8 +35,8 @@ const orders: ProductionOrder[] = [
     receivedAt: null,
     cancelledAt: null,
     lines: [
-      { id: "line-1", variantId: "variant-1", lineNumber: 1, modelName: "Paris", colorName: "Black", size: "M", quantity: 4 },
-      { id: "line-2", variantId: "variant-2", lineNumber: 2, modelName: "Paris", colorName: "Black", size: "L", quantity: 6 },
+      { id: "line-1", variantId: "variant-1", lineNumber: 1, modelName: "Paris", colorName: "Black", size: "M", quantity: 4, unitPrice: 327 },
+      { id: "line-2", variantId: "variant-2", lineNumber: 2, modelName: "Paris", colorName: "Black", size: "L", quantity: 6, unitPrice: 265 },
     ],
   },
   {
@@ -52,7 +52,7 @@ const orders: ProductionOrder[] = [
     receivedAt: null,
     cancelledAt: "2026-07-22T11:10:00.000Z",
     lines: [
-      { id: "line-3", variantId: "variant-3", lineNumber: 1, modelName: "Weave", colorName: "Sand", size: "40", quantity: 2 },
+      { id: "line-3", variantId: "variant-3", lineNumber: 1, modelName: "Weave", colorName: "Sand", size: "40", quantity: 2, unitPrice: null },
     ],
   },
 ];

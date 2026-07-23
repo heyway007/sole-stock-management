@@ -53,13 +53,19 @@ describe("ProductionOrderForm", () => {
 
     await selectParisBlackM(user);
     await user.type(screen.getByRole("spinbutton", { name: "จำนวน (คู่) รายการ 1" }), "4");
-    expect(screen.getByText("รวม 1 รายการ · 4 คู่")).toBeInTheDocument();
+    await user.type(screen.getByRole("spinbutton", { name: "ราคาต่อหน่วย รายการ 1" }), "327");
+    expect(screen.getByText("1,308.00 บาท")).toBeInTheDocument();
+    expect(screen.getByText("รวม 1 รายการ · 4 คู่ · 1,308.00 บาท")).toBeInTheDocument();
     expect(screen.queryByText(/คงเหลือ/)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "บันทึกใบผลิต" }));
     await waitFor(() => expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({
       status: "OPEN",
-      lines: [expect.objectContaining({ variantId: "paris-black-m", quantity: 4 })],
+      lines: [expect.objectContaining({
+        variantId: "paris-black-m",
+        quantity: 4,
+        unitPrice: 327,
+      })],
     })));
   });
 
@@ -69,6 +75,7 @@ describe("ProductionOrderForm", () => {
     await screen.findByRole("heading", { name: "สร้างใบผลิตออเดอร์" });
     await selectParisBlackM(user);
     await user.type(screen.getByRole("spinbutton", { name: "จำนวน (คู่) รายการ 1" }), "4");
+    await user.type(screen.getByRole("spinbutton", { name: "ราคาต่อหน่วย รายการ 1" }), "327");
     const orderDate = screen.getByLabelText("วันที่สั่งผลิต") as HTMLInputElement;
     await user.clear(orderDate);
     await user.type(orderDate, "2026-07-22");
@@ -95,11 +102,39 @@ describe("ProductionOrderForm", () => {
       updatedAt: "2026-07-22T11:00:00.000Z",
       receivedAt: null,
       cancelledAt: "2026-07-22T11:00:00.000Z",
-      lines: [{ id: "line-1", variantId: "paris-black-m", lineNumber: 1, modelName: "Paris", colorName: "Black", size: "M", quantity: 4 }],
+      lines: [{
+        id: "line-1",
+        variantId: "paris-black-m",
+        lineNumber: 1,
+        modelName: "Paris",
+        colorName: "Black",
+        size: "M",
+        quantity: 4,
+        unitPrice: null,
+      }],
     });
 
     expect(await screen.findByRole("heading", { name: "ไม่สามารถแก้ไขใบผลิตนี้ได้" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "กลับไปดูรายละเอียด" })).toHaveAttribute("href", "/production-orders/order-cancelled");
     expect(screen.queryByRole("button", { name: "บันทึกใบผลิต" })).not.toBeInTheDocument();
+  });
+
+  it("requires a valid price and keeps a legacy edit blank until completed", async () => {
+    const user = userEvent.setup();
+    const { onSaved } = renderForm();
+    await screen.findByRole("heading", { name: "สร้างใบผลิตออเดอร์" });
+    await selectParisBlackM(user);
+    await user.type(screen.getByRole("spinbutton", { name: "จำนวน (คู่) รายการ 1" }), "4");
+
+    await user.click(screen.getByRole("button", { name: "บันทึกใบผลิต" }));
+    expect(await screen.findByText(
+      "ราคาต่อหน่วยต้องมากกว่า 0 และมีทศนิยมไม่เกิน 2 ตำแหน่ง",
+    )).toBeInTheDocument();
+    expect(onSaved).not.toHaveBeenCalled();
+
+    const price = screen.getByRole("spinbutton", { name: "ราคาต่อหน่วย รายการ 1" });
+    await user.type(price, "327.555");
+    await user.click(screen.getByRole("button", { name: "บันทึกใบผลิต" }));
+    expect(onSaved).not.toHaveBeenCalled();
   });
 });

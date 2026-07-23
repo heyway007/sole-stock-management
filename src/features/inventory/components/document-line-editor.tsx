@@ -1,6 +1,7 @@
 "use client";
 
 import { Plus, Trash2 } from "lucide-react";
+import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
@@ -26,6 +27,7 @@ export interface DocumentLineDraft {
   creatingVariant: boolean;
   newSize: string;
   quantity: string;
+  unitPrice?: string;
 }
 
 let nextLineId = 0;
@@ -54,6 +56,15 @@ interface DocumentLineEditorProps {
   catalogColors?: Array<{ id: string; name: string }>;
   allowVariantCreation?: boolean;
   lineIndexOffset?: number;
+  extraLineFields?: (context: DocumentLineExtraFieldsContext) => ReactNode;
+}
+
+export interface DocumentLineExtraFieldsContext {
+  line: DocumentLineDraft;
+  index: number;
+  rowNumber: number;
+  controlId: string;
+  updateLine(update: Partial<DocumentLineDraft>, fields: string[]): void;
 }
 
 function uniqueById(items: Array<{ id: string; name: string }>) {
@@ -71,6 +82,7 @@ export function DocumentLineEditor({
   catalogColors,
   allowVariantCreation = false,
   lineIndexOffset = 0,
+  extraLineFields,
 }: DocumentLineEditorProps) {
   const { errorFor, clearErrors, clearAllErrors } = useDocumentValidation();
   const models = catalogModels ?? uniqueById(variants.map((variant) => ({ id: variant.modelId, name: variant.modelName })));
@@ -205,6 +217,13 @@ export function DocumentLineEditor({
                 announceError={false}
                 onChange={(event) => updateLine(line.id, { quantity: event.target.value }, ["quantity"])}
               />
+              {extraLineFields?.({
+                line,
+                index: validationIndex,
+                rowNumber,
+                controlId,
+                updateLine: (update, fields) => updateLine(line.id, update, fields),
+              })}
               {showAvailable && selected && <p className="available-quantity" role="status">คงเหลือ {selected.available} คู่</p>}
               {lines.length > 1 && (
                 <Button variant="ghost" className="remove-line" aria-label={`ลบรายการ ${rowNumber}`} onClick={() => { clearAllErrors(); onChange(lines.filter((candidate) => candidate.id !== line.id)); }}>

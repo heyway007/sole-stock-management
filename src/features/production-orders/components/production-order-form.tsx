@@ -28,6 +28,12 @@ import {
   validateProductionOrder,
 } from "../domain/validation";
 import { useProductionOrders } from "../production-order-provider";
+import {
+  formatBahtMinor,
+  lineTotalMinor,
+  parseUnitPriceInput,
+} from "../domain/money";
+import { ProductionOrderLinePrice } from "./production-order-line-price";
 
 interface ProductionOrderFormProps {
   order?: ProductionOrder;
@@ -42,7 +48,7 @@ function localDateValue(date = new Date()): string {
 }
 
 function initialLines(order: ProductionOrder | undefined, snapshot: InventorySnapshot): DocumentLineDraft[] {
-  if (!order) return [createDocumentLine()];
+  if (!order) return [{ ...createDocumentLine(), unitPrice: "" }];
   return order.lines.map((line) => {
     const variant = snapshot.variants.find((candidate) => candidate.id === line.variantId);
     return {
@@ -51,6 +57,7 @@ function initialLines(order: ProductionOrder | undefined, snapshot: InventorySna
       colorId: variant?.colorId ?? "",
       variantId: line.variantId,
       quantity: String(line.quantity),
+      unitPrice: line.unitPrice === null ? "" : String(line.unitPrice),
     };
   });
 }
@@ -101,6 +108,7 @@ function ProductionOrderFormReady({
     lines: lines.map((line) => ({
       variantId: line.variantId,
       quantity: Number(line.quantity),
+      unitPrice: parseUnitPriceInput(line.unitPrice ?? "") ?? Number.NaN,
     })),
   }), [expectedDate, lines, note, order, orderDate]);
   const initialFingerprint = useMemo(() => JSON.stringify({
@@ -108,16 +116,29 @@ function ProductionOrderFormReady({
     orderDate: initialOrderDate,
     expectedDate: initialExpectedDate,
     note: initialNote,
-    lines: initialDrafts.map((line) => ({ variantId: line.variantId, quantity: Number(line.quantity) })),
+    lines: initialDrafts.map((line) => ({
+      variantId: line.variantId,
+      quantity: Number(line.quantity),
+      unitPrice: parseUnitPriceInput(line.unitPrice ?? "") ?? Number.NaN,
+    })),
   }), [initialDrafts, initialExpectedDate, initialNote, initialOrderDate, order]);
   const dirty = JSON.stringify(input) !== initialFingerprint;
   useUnsavedChanges(!saved && dirty);
 
-  const lineCount = lines.filter((line) => line.variantId || line.quantity.trim()).length;
+  const activeLines = lines.filter((line) =>
+    line.variantId || line.quantity.trim() || line.unitPrice?.trim());
+  const lineCount = activeLines.length;
   const totalPairs = lines.reduce((total, line) => {
     const quantity = Number(line.quantity);
     return total + (Number.isFinite(quantity) && quantity > 0 ? quantity : 0);
   }, 0);
+  const lineTotals = activeLines.map((line) => {
+    const price = parseUnitPriceInput(line.unitPrice ?? "");
+    return price === null ? null : lineTotalMinor(Number(line.quantity), price);
+  });
+  const totalAmountMinor = lineCount > 0 && lineTotals.every((total) => total !== null)
+    ? lineTotals.reduce<number>((total, value) => total + (value ?? 0), 0)
+    : null;
   const contextErrors = useMemo<ValidationError[]>(() => validationErrors
     .filter((error) => error.path.startsWith("lines."))
     .map((error) => ({ ...error, code: validationCode(error) })), [validationErrors]);
@@ -208,10 +229,11 @@ function ProductionOrderFormReady({
             variants={variants}
             showAvailable={false}
             allowVariantCreation={false}
+            extraLineFields={(context) => <ProductionOrderLinePrice {...context} />}
           />
 
           <div className="production-order-form-summary" role="status">
-            รวม {lineCount} รายการ · {totalPairs} คู่
+            รวม {lineCount} รายการ · {totalPairs} คู่ · {formatBahtMinor(totalAmountMinor)}
           </div>
           {formError && <div className="form-error-banner" role="alert">{formError}</div>}
           <footer className="document-actions">

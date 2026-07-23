@@ -60,7 +60,7 @@ describe("production-order domain", () => {
   it.each([
     ["expected date", { ...validInput, expectedDate: "2026-07-21" }, "expectedDate"],
     ["empty lines", { ...validInput, lines: [] }, "lines"],
-    ["quantity", { ...validInput, lines: [{ variantId: "variant-1", quantity: 1.5 }] }, "lines.0.quantity"],
+    ["quantity", { ...validInput, lines: [{ variantId: "variant-1", quantity: 1.5, unitPrice: 100 }] }, "lines.0.quantity"],
     ["zero unit price", { ...validInput, lines: [{ variantId: "variant-1", quantity: 1, unitPrice: 0 }] }, "lines.0.unitPrice"],
     ["unit price precision", { ...validInput, lines: [{ variantId: "variant-1", quantity: 1, unitPrice: 327.555 }] }, "lines.0.unitPrice"],
     [

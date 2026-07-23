@@ -32,8 +32,8 @@ const order: ProductionOrder = {
   receivedAt: null,
   cancelledAt: null,
   lines: [
-    { id: "line-1", variantId: "paris-black-m", lineNumber: 1, modelName: "Paris", colorName: "Black", size: "M", quantity: 4 },
-    { id: "line-2", variantId: "paris-black-l", lineNumber: 2, modelName: "Paris", colorName: "Black", size: "L", quantity: 6 },
+    { id: "line-1", variantId: "paris-black-m", lineNumber: 1, modelName: "Paris", colorName: "Black", size: "M", quantity: 4, unitPrice: 327 },
+    { id: "line-2", variantId: "paris-black-l", lineNumber: 2, modelName: "Paris", colorName: "Black", size: "L", quantity: 6, unitPrice: 265 },
   ],
 };
 

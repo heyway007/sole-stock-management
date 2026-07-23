@@ -483,12 +483,21 @@ button, input, select { font: inherit; }
 .production-form-header { align-items: center; flex-wrap: wrap; }
 .production-order-metadata { display: grid; gap: 13px; }
 .production-order-form-summary { border: 1px solid #badbca; border-radius: 13px; color: var(--forest-800); background: #edf7f1; padding: 12px 15px; font-weight: 800; text-align: right; }
+.production-line-amount { min-height: 44px; display: grid; align-content: center; gap: 2px; border-radius: 10px; background: #f3f5f1; padding: 8px 10px; }
+.production-line-amount span { color: var(--muted); font-size: 0.72rem; }
+.production-line-amount strong { color: var(--forest-800); }
 .production-terminal-state { text-align: center; }
 .production-terminal-state > div { display: grid; justify-items: center; gap: 12px; }
 .production-terminal-state h1, .production-terminal-state p { margin: 0; }
 
 @media (min-width: 600px) {
   .production-order-metadata { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1024px) {
+  .production-order-form .document-line {
+    grid-template-columns: repeat(3, minmax(120px, 1fr)) minmax(110px, .65fr) minmax(130px, .8fr) minmax(140px, .9fr) auto;
+  }
 }
 
 /* Production order detail and actions */
