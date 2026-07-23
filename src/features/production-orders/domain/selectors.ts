@@ -1,4 +1,5 @@
 import type { ProductionOrder, ProductionOrderStatus } from "./types";
+import { lineTotalMinor } from "./money";
 
 export interface ProductionOrderFilters {
   query: string;
@@ -6,9 +7,16 @@ export interface ProductionOrderFilters {
 }
 
 export function summarizeProductionOrder(order: ProductionOrder) {
+  const lineTotals = order.lines.map((line) =>
+    lineTotalMinor(line.quantity, line.unitPrice));
+  const hasCompletePricing = lineTotals.every((value) => value !== null);
   return {
     lineCount: order.lines.length,
     totalPairs: order.lines.reduce((total, line) => total + line.quantity, 0),
+    hasCompletePricing,
+    totalAmountMinor: hasCompletePricing
+      ? lineTotals.reduce<number>((total, value) => total + (value ?? 0), 0)
+      : null,
   };
 }
 

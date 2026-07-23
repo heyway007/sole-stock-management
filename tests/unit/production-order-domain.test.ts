@@ -8,8 +8,8 @@ const validInput: ProductionOrderInput = {
   expectedDate: "2026-08-05",
   note: "รอบต้นเดือน",
   lines: [
-    { variantId: "variant-1", quantity: 4 },
-    { variantId: "variant-2", quantity: 6 },
+    { variantId: "variant-1", quantity: 4, unitPrice: 327 },
+    { variantId: "variant-2", quantity: 6, unitPrice: 265 },
   ],
 };
 
@@ -34,6 +34,7 @@ const order: ProductionOrder = {
       colorName: "Black",
       size: "M",
       quantity: 4,
+      unitPrice: 327,
     },
     {
       id: "line-2",
@@ -43,6 +44,7 @@ const order: ProductionOrder = {
       colorName: "Black",
       size: "L",
       quantity: 6,
+      unitPrice: 265,
     },
   ],
 };
@@ -59,9 +61,11 @@ describe("production-order domain", () => {
     ["expected date", { ...validInput, expectedDate: "2026-07-21" }, "expectedDate"],
     ["empty lines", { ...validInput, lines: [] }, "lines"],
     ["quantity", { ...validInput, lines: [{ variantId: "variant-1", quantity: 1.5 }] }, "lines.0.quantity"],
+    ["zero unit price", { ...validInput, lines: [{ variantId: "variant-1", quantity: 1, unitPrice: 0 }] }, "lines.0.unitPrice"],
+    ["unit price precision", { ...validInput, lines: [{ variantId: "variant-1", quantity: 1, unitPrice: 327.555 }] }, "lines.0.unitPrice"],
     [
       "duplicate variant",
-      { ...validInput, lines: [...validInput.lines, { variantId: "variant-1", quantity: 2 }] },
+      { ...validInput, lines: [...validInput.lines, { variantId: "variant-1", quantity: 2, unitPrice: 200 }] },
       "lines.2.variantId",
     ],
   ])("rejects invalid %s", (_label, input, path) => {
@@ -73,7 +77,20 @@ describe("production-order domain", () => {
   });
 
   it("summarizes and searches snapshotted order lines", () => {
-    expect(summarizeProductionOrder(order)).toEqual({ lineCount: 2, totalPairs: 10 });
+    expect(summarizeProductionOrder(order)).toEqual({
+      lineCount: 2,
+      totalPairs: 10,
+      hasCompletePricing: true,
+      totalAmountMinor: 289800,
+    });
+    expect(summarizeProductionOrder({
+      ...order,
+      lines: order.lines.map((line, index) =>
+        index === 0 ? { ...line, unitPrice: null } : line),
+    })).toMatchObject({
+      hasCompletePricing: false,
+      totalAmountMinor: null,
+    });
     expect(filterProductionOrders([order], { query: "paris black", status: "ALL" })).toEqual([order]);
     expect(filterProductionOrders([order], { query: "", status: "RECEIVED" })).toEqual([]);
   });

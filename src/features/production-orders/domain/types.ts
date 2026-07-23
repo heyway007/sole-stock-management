@@ -5,6 +5,7 @@ export type ProductionOrderStatus = "OPEN" | "RECEIVED" | "CANCELLED";
 export interface ProductionOrderLineInput {
   variantId: string;
   quantity: number;
+  unitPrice: number;
 }
 
 export interface ProductionOrderInput {
@@ -15,12 +16,15 @@ export interface ProductionOrderInput {
   lines: ProductionOrderLineInput[];
 }
 
-export interface ProductionOrderLine extends ProductionOrderLineInput {
+export interface ProductionOrderLine {
   id: string;
+  variantId: string;
   lineNumber: number;
   modelName: string;
   colorName: string;
   size: string;
+  quantity: number;
+  unitPrice: number | null;
 }
 
 export interface ProductionOrder {
@@ -45,6 +49,6 @@ export interface ProductionOrderReceiptResult {
 
 export interface ProductionOrderValidationError {
   path: string;
-  code: "REQUIRED" | "INVALID_DATE_RANGE" | "INVALID_QUANTITY" | "DUPLICATE_VARIANT";
+  code: "REQUIRED" | "INVALID_DATE_RANGE" | "INVALID_QUANTITY" | "INVALID_UNIT_PRICE" | "DUPLICATE_VARIANT";
   message: string;
 }

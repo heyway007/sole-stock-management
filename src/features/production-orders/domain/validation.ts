@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { amountToMinor } from "./money";
 import type { ProductionOrderInput, ProductionOrderValidationError } from "./types";
 
 const schema = z.object({
@@ -9,6 +10,7 @@ const schema = z.object({
   lines: z.array(z.object({
     variantId: z.string().trim().min(1),
     quantity: z.number().finite().int().positive(),
+    unitPrice: z.number().refine((value) => amountToMinor(value) !== null),
   })).min(1),
 });
 
@@ -29,6 +31,13 @@ function schemaError(path: string): ProductionOrderValidationError {
       path,
       code: "INVALID_QUANTITY",
       message: "จำนวนต้องเป็นจำนวนเต็มมากกว่า 0",
+    };
+  }
+  if (path.endsWith(".unitPrice")) {
+    return {
+      path,
+      code: "INVALID_UNIT_PRICE",
+      message: "ราคาต่อหน่วยต้องมากกว่า 0 และมีทศนิยมไม่เกิน 2 ตำแหน่ง",
     };
   }
   return {
