@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Edit3, History, RotateCcw, Search } from "lucide-react";
+import { Edit3, FileText, History, RotateCcw, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -102,6 +102,9 @@ export function InventoryPageContent() {
             <span className="inventory-count"><strong>{rows.length}</strong><small>รายการ</small></span>
             <span className="inventory-count"><strong>{totalPairs}</strong><small>คู่</small></span>
           </div>
+          <Link className="button button--secondary" href="/inventory/print">
+            <FileText aria-hidden size={17} />ดู PDF
+          </Link>
           <ClearStockButton
             positiveVariants={clearSummary.positiveVariants}
             totalPairs={clearSummary.totalPairs}

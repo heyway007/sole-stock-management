@@ -569,6 +569,13 @@ button, input, select { font: inherit; }
 .signature-line { width: min(100%, 220px); border-top: 1px solid #17211c; }
 .production-print-signatures small { color: #5d6962; }
 
+/* A4 inventory report print preview (reuses .production-print-preview/page/header/summary) */
+.inventory-print-table { width: 100%; margin-top: 20px; border-collapse: collapse; }
+.inventory-print-table th, .inventory-print-table td { border: 1px solid #aeb7b1; padding: 9px 10px; text-align: left; }
+.inventory-print-table th { color: #fff; background: var(--forest-800); font-size: 0.78rem; }
+.inventory-print-table th:first-child, .inventory-print-table td:first-child { width: 42px; text-align: center; }
+.inventory-print-table .numeric { text-align: right; }
+
 @page { size: A4 portrait; margin: 12mm; }
 
 @media print {
@@ -580,9 +587,10 @@ button, input, select { font: inherit; }
   .production-print-page { width: auto; min-height: auto; max-width: none; margin: 0; color: #000; background: #fff; padding: 0; box-shadow: none; }
   .production-print-header { border-color: #000; }
   .production-print-header { grid-template-columns: minmax(0, 1.35fr) minmax(230px, .65fr); }
-  .production-print-table thead { display: table-header-group; }
-  .production-print-table th { color: #000; background: #fff; }
-  .production-print-table tr, .production-print-summary, .production-print-signatures { break-inside: avoid; }
+  .production-print-table thead, .inventory-print-table thead { display: table-header-group; }
+  .production-print-table th, .inventory-print-table th { color: #000; background: #fff; }
+  .production-print-table tr, .production-print-summary, .production-print-signatures,
+  .inventory-print-table tr { break-inside: avoid; }
 }
 
 @media (max-width: 599px) {
@@ -594,4 +602,5 @@ button, input, select { font: inherit; }
   .production-print-document { text-align: left; }
   .production-print-table th, .production-print-table td { padding: 7px 5px; font-size: 0.75rem; }
   .production-print-signatures { gap: 24px; margin-top: 64px; }
+  .inventory-print-table th, .inventory-print-table td { padding: 7px 5px; font-size: 0.75rem; }
 }

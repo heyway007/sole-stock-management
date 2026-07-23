@@ -25,7 +25,7 @@ export interface DashboardSummary {
   lowStockCount: number;
 }
 
-function inventoryRows(snapshot: InventorySnapshot): InventoryRow[] {
+export function inventoryRows(snapshot: InventorySnapshot): InventoryRow[] {
   const models = new Map(snapshot.models.map((model) => [model.id, model]));
   const colors = new Map(snapshot.colors.map((color) => [color.id, color]));
 
