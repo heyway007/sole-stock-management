@@ -18,10 +18,10 @@ class MemoryStorage implements Storage {
 
 class ReceiptRepository extends DemoInventoryRepository {
   readonly inputs: StockDocumentInput[] = [];
-  readonly ensured: Array<{ modelId: string; colorId: string; size: number }> = [];
+  readonly ensured: Array<{ modelId: string; colorId: string; size: string }> = [];
   failNext = false;
 
-  override async ensureVariant(modelId: string, colorId: string, size: number) {
+  override async ensureVariant(modelId: string, colorId: string, size: string) {
     this.ensured.push({ modelId, colorId, size });
     return super.ensureVariant(modelId, colorId, size);
   }
@@ -153,10 +153,10 @@ describe("ReceivePage", () => {
     await user.click(screen.getByRole("button", { name: "บันทึกรับสินค้า" }));
 
     expect(await screen.findByRole("status", { name: "บันทึกสำเร็จ" })).toHaveTextContent("รับสินค้าเรียบร้อย");
-    expect(repository.ensured).toEqual([{ modelId: model.id, colorId: color.id, size: 44.5 }]);
+    expect(repository.ensured).toEqual([{ modelId: model.id, colorId: color.id, size: "44.5" }]);
     const snapshot = await repository.load();
     const created = snapshot.variants.find((variant) =>
-      variant.modelId === model.id && variant.colorId === color.id && variant.size === 44.5,
+      variant.modelId === model.id && variant.colorId === color.id && variant.size === "44.5",
     );
     expect(created).toBeDefined();
     expect(snapshot.balances[created!.id]).toBe(2);

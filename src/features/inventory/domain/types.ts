@@ -21,14 +21,14 @@ export interface ProductVariant {
   id: string;
   modelId: string;
   colorId: string;
-  size: number;
+  size: string;
   lowStockThreshold: number;
   active: boolean;
 }
 
 export interface StockDocumentLineInput {
   variantId: string;
-  size: number;
+  size: string;
   quantity: number;
   direction?: "IN" | "OUT";
   section?: "RETURNED" | "REPLACEMENT";

@@ -1,9 +1,19 @@
 import { z } from "zod";
+import { normalizeSizeLabel } from "./size-label";
 import type { StockDocumentInput, ValidationError } from "./types";
+
+const sizeLabelSchema = z.string().transform((value, context) => {
+  const normalized = normalizeSizeLabel(value);
+  if (!normalized) {
+    context.addIssue({ code: "custom", message: "INVALID_SIZE" });
+    return z.NEVER;
+  }
+  return normalized;
+});
 
 const lineSchema = z.object({
   variantId: z.string().trim().min(1),
-  size: z.number().finite().positive(),
+  size: sizeLabelSchema,
   quantity: z.number().finite().int().positive(),
   direction: z.enum(["IN", "OUT"]).optional(),
   section: z.enum(["RETURNED", "REPLACEMENT"]).optional(),
@@ -34,7 +44,7 @@ export class DocumentValidationError extends Error {
 
 const thaiMessages = {
   required: "กรุณากรอกข้อมูลให้ครบถ้วน",
-  invalidSize: "ขนาดรองเท้าต้องมากกว่า 0",
+  invalidSize: "กรุณาระบุไซซ์รองเท้า",
   invalidQuantity: "จำนวนต้องเป็นจำนวนเต็มบวก",
   duplicateVariant: "ไม่สามารถเลือกรุ่นรองเท้าซ้ำในรายการเดียวกันได้",
   invalidExchange: "รายการแลกเปลี่ยนต้องมีทั้งรายการคืนและรายการทดแทน",

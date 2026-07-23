@@ -100,7 +100,7 @@ const input: StockDocumentInput = {
   type: "RECEIPT",
   effectiveDate: "2026-07-22",
   reference: "PO-1",
-  lines: [{ variantId: "variant-1", size: 38.5, quantity: 2 }],
+  lines: [{ variantId: "variant-1", size: "M", quantity: 2 }],
 };
 
 function asClient(client: ContractClient): InventorySupabaseClient {
@@ -267,7 +267,7 @@ describe("SupabaseInventoryRepository client contract", () => {
 
   it.each([
     ["movement type", (payload: ReturnType<typeof snapshotPayload>) => { payload.documents[0].movement_type = "UNKNOWN"; }],
-    ["variant number", (payload: ReturnType<typeof snapshotPayload>) => { payload.variants[0].size = "not-a-number"; }],
+    ["canonical variant size", (payload: ReturnType<typeof snapshotPayload>) => { payload.variants[0].size = " m "; }],
     ["balance number", (payload: ReturnType<typeof snapshotPayload>) => { payload.balances[0].quantity = -1; }],
     ["identifier", (payload: ReturnType<typeof snapshotPayload>) => { payload.models[0].id = ""; }],
     ["client request identifier", (payload: ReturnType<typeof snapshotPayload>) => { payload.documents[0].client_request_id = ""; }],
@@ -417,7 +417,7 @@ describe("SupabaseInventoryRepository client contract", () => {
         id: "variant-2",
         modelId: "model-1",
         colorId: "color-1",
-        size: 44.5,
+        size: "2XL",
         lowStockThreshold: 3,
         active: true,
       },
@@ -425,31 +425,31 @@ describe("SupabaseInventoryRepository client contract", () => {
     });
     const repository = new SupabaseInventoryRepository("https://example.supabase.co", "anon", asClient(client));
 
-    await expect(repository.ensureVariant("model-1", "color-1", 44.5)).resolves.toEqual({
+    await expect(repository.ensureVariant("model-1", "color-1", " 2xl ")).resolves.toEqual({
       id: "variant-2",
       modelId: "model-1",
       colorId: "color-1",
-      size: 44.5,
+      size: "2XL",
       lowStockThreshold: 3,
       active: true,
     });
     expect(client.rpcCalls).toEqual([{
       name: "ensure_product_variant",
-      args: { p_model_id: "model-1", p_color_id: "color-1", p_size: 44.5 },
+      args: { p_model_id: "model-1", p_color_id: "color-1", p_size: "2XL" },
     }]);
     expect(client.tableCalls).toHaveLength(0);
   });
 
   it.each([
-    ["empty identity", { id: "", modelId: "model-1", colorId: "color-1", size: 44.5, lowStockThreshold: 3, active: true }],
-    ["empty model", { id: "variant-2", modelId: "", colorId: "color-1", size: 44.5, lowStockThreshold: 3, active: true }],
-    ["unsupported precision", { id: "variant-2", modelId: "model-1", colorId: "color-1", size: 44.55, lowStockThreshold: 3, active: true }],
+    ["empty identity", { id: "", modelId: "model-1", colorId: "color-1", size: "2XL", lowStockThreshold: 3, active: true }],
+    ["empty model", { id: "variant-2", modelId: "", colorId: "color-1", size: "2XL", lowStockThreshold: 3, active: true }],
+    ["noncanonical label", { id: "variant-2", modelId: "model-1", colorId: "color-1", size: " 2xl ", lowStockThreshold: 3, active: true }],
   ])("rejects a malformed ensured variant response with %s", async (_label, payload) => {
     const client = new ContractClient();
     client.rpcResults.push({ data: payload as unknown as Json, error: null });
     const repository = new SupabaseInventoryRepository("https://example.supabase.co", "anon", asClient(client));
 
-    await expect(repository.ensureVariant("model-1", "color-1", 44.5)).rejects.toThrow();
+    await expect(repository.ensureVariant("model-1", "color-1", "2XL")).rejects.toThrow();
   });
 
   it("uses the open model table contract for a trimmed catalog insert", async () => {

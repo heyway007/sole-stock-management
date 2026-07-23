@@ -8,6 +8,7 @@ import type {
   StockDocumentInput,
   StockDocumentLine,
 } from "@/features/inventory/domain/types";
+import { normalizeSizeLabel } from "@/features/inventory/domain/size-label";
 import type { InventoryRepository } from "./inventory-repository";
 import { createSeedSnapshot } from "./seed";
 
@@ -61,15 +62,15 @@ function isCatalogRecord(value: unknown): value is ShoeModel | Color {
 }
 
 function isVariant(value: unknown, modelIds: Set<string>, colorIds: Set<string>): value is ProductVariant {
+  const normalizedSize = isRecord(value) ? normalizeSizeLabel(value.size) : null;
   return isRecord(value)
     && isNonEmptyString(value.id)
     && isNonEmptyString(value.modelId)
     && modelIds.has(value.modelId)
     && isNonEmptyString(value.colorId)
     && colorIds.has(value.colorId)
-    && typeof value.size === "number"
-    && Number.isFinite(value.size)
-    && value.size > 0
+    && typeof value.size === "string"
+    && normalizedSize === value.size
     && typeof value.lowStockThreshold === "number"
     && Number.isInteger(value.lowStockThreshold)
     && value.lowStockThreshold >= 0
@@ -222,10 +223,9 @@ export class DemoInventoryRepository implements InventoryRepository {
     });
   }
 
-  async ensureVariant(modelId: string, colorId: string, size: number): Promise<ProductVariant> {
-    if (!Number.isFinite(size) || size <= 0 || Math.round(size * 10) !== size * 10) {
-      throw new Error("ไซซ์รองเท้าต้องเป็นเลขทศนิยมบวกไม่เกิน 1 ตำแหน่ง");
-    }
+  async ensureVariant(modelId: string, colorId: string, size: string): Promise<ProductVariant> {
+    const normalizedSize = normalizeSizeLabel(size);
+    if (!normalizedSize) throw new Error("กรุณาระบุไซซ์รองเท้า");
     return this.mutate((snapshot) => {
       if (!snapshot.models.some((model) => model.id === modelId && model.active)) {
         throw new Error("ไม่พบรุ่นรองเท้าที่เปิดใช้งาน");
@@ -234,7 +234,9 @@ export class DemoInventoryRepository implements InventoryRepository {
         throw new Error("ไม่พบสีที่เปิดใช้งาน");
       }
       const existing = snapshot.variants.find((variant) =>
-        variant.modelId === modelId && variant.colorId === colorId && variant.size === size,
+        variant.modelId === modelId
+        && variant.colorId === colorId
+        && variant.size.toLocaleLowerCase() === normalizedSize.toLocaleLowerCase(),
       );
       if (existing) {
         const variant = existing.active ? existing : { ...existing, active: true };
@@ -249,7 +251,7 @@ export class DemoInventoryRepository implements InventoryRepository {
         id: this.createId(),
         modelId,
         colorId,
-        size,
+        size: normalizedSize,
         lowStockThreshold: 3,
         active: true,
       };

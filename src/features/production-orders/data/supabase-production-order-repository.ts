@@ -5,6 +5,7 @@ import {
   type Json,
 } from "@/lib/supabase";
 import type { StockDocument, StockDocumentLine } from "@/features/inventory/domain/types";
+import { normalizeSizeLabel } from "@/features/inventory/domain/size-label";
 import type {
   ProductionOrder,
   ProductionOrderInput,
@@ -48,6 +49,7 @@ function isStatus(value: unknown): value is ProductionOrderStatus {
 }
 
 function mappedLine(value: unknown): ProductionOrderLine {
+  const size = isRecord(value) ? normalizeSizeLabel(value.size) : null;
   if (!isRecord(value)
     || !isNonEmptyString(value.id)
     || !isNonEmptyString(value.variantId)
@@ -56,9 +58,9 @@ function mappedLine(value: unknown): ProductionOrderLine {
     || value.lineNumber < 1
     || !isNonEmptyString(value.modelName)
     || !isNonEmptyString(value.colorName)
-    || typeof value.size !== "number"
-    || !Number.isFinite(value.size)
-    || value.size <= 0
+    || typeof value.size !== "string"
+    || !size
+    || size !== value.size
     || typeof value.quantity !== "number"
     || !Number.isInteger(value.quantity)
     || value.quantity < 1) {
@@ -70,7 +72,7 @@ function mappedLine(value: unknown): ProductionOrderLine {
     lineNumber: value.lineNumber,
     modelName: value.modelName,
     colorName: value.colorName,
-    size: value.size,
+    size,
     quantity: value.quantity,
   };
 }

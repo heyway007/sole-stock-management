@@ -1,4 +1,5 @@
 import type { InventorySnapshot } from "./types";
+import { compareSizeLabels } from "./size-label";
 
 export interface InventoryFilters {
   query: string;
@@ -11,7 +12,7 @@ export interface InventoryRow {
   variantId: string;
   modelName: string;
   colorName: string;
-  size: number;
+  size: string;
   quantity: number;
   lowStockThreshold: number;
   status: "NORMAL" | "LOW" | "OUT";
@@ -54,7 +55,8 @@ function inventoryRows(snapshot: InventorySnapshot): InventoryRow[] {
     .sort((left, right) =>
       left.modelName.localeCompare(right.modelName, "en", { sensitivity: "base" })
       || left.colorName.localeCompare(right.colorName, "en", { sensitivity: "base" })
-      || left.size - right.size,
+      || compareSizeLabels(left.modelName, left.size, right.size)
+      || left.variantId.localeCompare(right.variantId),
     );
 }
 
@@ -71,7 +73,7 @@ export function filterInventory(snapshot: InventorySnapshot, filters: InventoryF
     if (!query) return true;
     return row.modelName.toLocaleLowerCase("en-US").includes(query)
       || row.colorName.toLocaleLowerCase("en-US").includes(query)
-      || String(row.size).includes(query);
+      || row.size.toLocaleLowerCase().includes(query);
   });
 }
 

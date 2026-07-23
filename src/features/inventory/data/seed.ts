@@ -14,7 +14,8 @@ const catalog = [
   ["weave", "Weave", "sand", "Sand"],
 ] as const;
 
-function buildVariant(modelId: string, colorId: string, size: number): ProductVariant {
+function buildVariant(modelId: string, colorId: string, numericSize: number): ProductVariant {
+  const size = String(numericSize);
   return {
     id: `${modelId}-${colorId}-${size}`,
     modelId,

@@ -18,10 +18,10 @@ function makeSnapshot(): InventorySnapshot {
       { id: "color-red", name: "Red", active: true },
     ],
     variants: [
-      { id: "z-red-40", modelId: "model-z", colorId: "color-red", size: 40, lowStockThreshold: 3, active: true },
-      { id: "a-black-38.5", modelId: "model-a", colorId: "color-black", size: 38.5, lowStockThreshold: 3, active: true },
-      { id: "a-black-40", modelId: "model-a", colorId: "color-black", size: 40, lowStockThreshold: 3, active: true },
-      { id: "inactive", modelId: "model-a", colorId: "color-red", size: 39, lowStockThreshold: 3, active: false },
+      { id: "z-red-40", modelId: "model-z", colorId: "color-red", size: "40", lowStockThreshold: 3, active: true },
+      { id: "a-black-38.5", modelId: "model-a", colorId: "color-black", size: "38.5", lowStockThreshold: 3, active: true },
+      { id: "a-black-40", modelId: "model-a", colorId: "color-black", size: "40", lowStockThreshold: 3, active: true },
+      { id: "inactive", modelId: "model-a", colorId: "color-red", size: "39", lowStockThreshold: 3, active: false },
     ],
     balances: { "z-red-40": 0, "a-black-38.5": 3, "a-black-40": 9, inactive: 1 },
     documents: [

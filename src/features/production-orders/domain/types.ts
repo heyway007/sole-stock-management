@@ -20,7 +20,7 @@ export interface ProductionOrderLine extends ProductionOrderLineInput {
   lineNumber: number;
   modelName: string;
   colorName: string;
-  size: number;
+  size: string;
 }
 
 export interface ProductionOrder {

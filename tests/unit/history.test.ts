@@ -13,8 +13,8 @@ const snapshot: InventorySnapshot = {
     { id: "olive", name: "Olive", active: true },
   ],
   variants: [
-    { id: "paris-black-38.5", modelId: "paris", colorId: "black", size: 38.5, lowStockThreshold: 3, active: true },
-    { id: "castor-olive-42", modelId: "castor", colorId: "olive", size: 42, lowStockThreshold: 3, active: true },
+    { id: "paris-black-38.5", modelId: "paris", colorId: "black", size: "38.5", lowStockThreshold: 3, active: true },
+    { id: "castor-olive-42", modelId: "castor", colorId: "olive", size: "42", lowStockThreshold: 3, active: true },
   ],
   balances: { "paris-black-38.5": 8, "castor-olive-42": 2 },
   documents: [

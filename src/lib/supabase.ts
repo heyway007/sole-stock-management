@@ -28,7 +28,7 @@ type ProductVariantRow = {
   id: string;
   model_id: string;
   color_id: string;
-  size: string | number;
+  size: string;
   low_stock_threshold: number;
   active: boolean;
   created_at: string;
@@ -93,7 +93,7 @@ export interface InventoryDatabase {
           id?: string;
           model_id: string;
           color_id: string;
-          size: string | number;
+          size: string;
           low_stock_threshold?: number;
           active?: boolean;
           created_at?: string;
@@ -142,7 +142,7 @@ export interface InventoryDatabase {
         Returns: Json;
       };
       ensure_product_variant: {
-        Args: { p_model_id: string; p_color_id: string; p_size: number };
+        Args: { p_model_id: string; p_color_id: string; p_size: string };
         Returns: Json;
       };
       post_stock_document: {

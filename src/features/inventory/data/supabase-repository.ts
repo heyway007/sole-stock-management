@@ -10,6 +10,7 @@ import type {
   StockDocumentInput,
   StockDocumentLine,
 } from "@/features/inventory/domain/types";
+import { normalizeSizeLabel } from "@/features/inventory/domain/size-label";
 import type { InventoryRepository } from "./inventory-repository";
 
 export const PENDING_POSTS_STORAGE_KEY = "sole-stock.supabase.pending-posts.v1";
@@ -41,7 +42,7 @@ interface VariantRow {
   id: string;
   model_id: string;
   color_id: string;
-  size: string | number;
+  size: string;
   low_stock_threshold: number;
   active: boolean;
 }
@@ -165,16 +166,17 @@ function snapshotRows(payload: unknown): InventoryDatabaseRows {
   if (!hasUniqueValues([...modelIds]) || modelIds.size !== payload.models.length
     || !hasUniqueValues([...colorIds]) || colorIds.size !== payload.colors.length
     || !payload.variants.every((value): value is VariantRow => {
+      const normalizedSize = isRecord(value)
+        ? normalizeSizeLabel(value.size)
+        : null;
       if (!isRecord(value)
         || !isNonEmptyString(value.id)
         || !isNonEmptyString(value.model_id)
         || !modelIds.has(value.model_id)
         || !isNonEmptyString(value.color_id)
         || !colorIds.has(value.color_id)
-        || (typeof value.size !== "string" && typeof value.size !== "number")
-        || (typeof value.size === "string" && value.size.trim() === "")
-        || !Number.isFinite(Number(value.size))
-        || Number(value.size) <= 0
+        || typeof value.size !== "string"
+        || normalizedSize !== value.size
         || typeof value.low_stock_threshold !== "number"
         || !Number.isInteger(value.low_stock_threshold)
         || value.low_stock_threshold < 0
@@ -297,14 +299,15 @@ function postedDocument(payload: unknown): StockDocument {
 }
 
 function ensuredVariant(payload: unknown): ProductVariant {
+  const normalizedSize = isRecord(payload)
+    ? normalizeSizeLabel(payload.size)
+    : null;
   if (!isRecord(payload)
     || !isNonEmptyString(payload.id)
     || !isNonEmptyString(payload.modelId)
     || !isNonEmptyString(payload.colorId)
-    || typeof payload.size !== "number"
-    || !Number.isFinite(payload.size)
-    || payload.size <= 0
-    || Math.round(payload.size * 10) !== payload.size * 10
+    || typeof payload.size !== "string"
+    || normalizedSize !== payload.size
     || typeof payload.lowStockThreshold !== "number"
     || !Number.isInteger(payload.lowStockThreshold)
     || payload.lowStockThreshold < 0
@@ -342,7 +345,7 @@ export function mapInventorySnapshot(rows: InventoryDatabaseRows): InventorySnap
       id: variant.id,
       modelId: variant.model_id,
       colorId: variant.color_id,
-      size: Number(variant.size),
+      size: variant.size,
       lowStockThreshold: variant.low_stock_threshold,
       active: variant.active,
     })),
@@ -614,14 +617,13 @@ export class SupabaseInventoryRepository implements InventoryRepository {
     return postedDocument(result.data);
   }
 
-  async ensureVariant(modelId: string, colorId: string, size: number): Promise<ProductVariant> {
-    if (!Number.isFinite(size) || size <= 0 || Math.round(size * 10) !== size * 10) {
-      throw new Error("ไซซ์รองเท้าต้องเป็นเลขทศนิยมบวกไม่เกิน 1 ตำแหน่ง");
-    }
+  async ensureVariant(modelId: string, colorId: string, size: string): Promise<ProductVariant> {
+    const normalizedSize = normalizeSizeLabel(size);
+    if (!normalizedSize) throw new Error("กรุณาระบุไซซ์รองเท้า");
     const result = await this.client.rpc("ensure_product_variant", {
       p_model_id: modelId,
       p_color_id: colorId,
-      p_size: size,
+      p_size: normalizedSize,
     });
     throwFor(result.error);
     return ensuredVariant(result.data);

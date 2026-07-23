@@ -95,7 +95,7 @@ export function IssuePageContent() {
       ...metadata,
       lines: lines.map((line) => ({
         variantId: line.variantId,
-        size: variants.find((variant) => variant.id === line.variantId)?.size ?? 0,
+        size: variants.find((variant) => variant.id === line.variantId)?.size ?? "",
         quantity: Number(line.quantity),
         ...(reason === "ADJUSTMENT" ? { direction: adjustmentDirection as "IN" | "OUT" } : {}),
       })),

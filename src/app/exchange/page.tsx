@@ -46,7 +46,7 @@ export function ExchangePageContent() {
   function commandLine(line: DocumentLineDraft, section: "RETURNED" | "REPLACEMENT") {
     return {
       variantId: line.variantId,
-      size: variants.find((variant) => variant.id === line.variantId)?.size ?? 0,
+      size: variants.find((variant) => variant.id === line.variantId)?.size ?? "",
       quantity: Number(line.quantity),
       section,
     };

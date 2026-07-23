@@ -2,19 +2,27 @@ import { describe, expect, it } from "vitest";
 import { validateDocument } from "@/features/inventory/domain/validation";
 
 describe("validateDocument", () => {
-  it("accepts decimal sizes and multiple positive receipt lines", () => {
+  it("accepts and normalizes text sizes with multiple positive receipt lines", () => {
     const result = validateDocument({
       type: "RECEIPT",
       effectiveDate: "2026-07-22",
       reference: "PO-1001",
       note: "",
       lines: [
-        { variantId: "paris-black-38.5", size: 38.5, quantity: 5 },
-        { variantId: "paris-black-39", size: 39, quantity: 3 },
+        { variantId: "paris-black-m", size: " m ", quantity: 5 },
+        { variantId: "paris-black-free", size: "free", quantity: 3 },
       ],
     });
 
-    expect(result.success).toBe(true);
+    expect(result).toMatchObject({
+      success: true,
+      data: {
+        lines: [
+          { variantId: "paris-black-m", size: "M", quantity: 5 },
+          { variantId: "paris-black-free", size: "FREE", quantity: 3 },
+        ],
+      },
+    });
   });
 
   it("rejects duplicate variants and fractional pair quantities", () => {
@@ -24,8 +32,8 @@ describe("validateDocument", () => {
       reference: "",
       note: "",
       lines: [
-        { variantId: "paris-black-38.5", size: 38.5, quantity: 1.5 },
-        { variantId: "paris-black-38.5", size: 38.5, quantity: 2 },
+        { variantId: "paris-black-m", size: "M", quantity: 1.5 },
+        { variantId: "paris-black-m", size: "M", quantity: 2 },
       ],
     });
 
@@ -45,8 +53,8 @@ describe("validateDocument", () => {
       type: "RECEIPT",
       effectiveDate: "2026-07-22",
       lines: [
-        { variantId: " paris-black-39 ", size: 39, quantity: 1 },
-        { variantId: "paris-black-39", size: 39, quantity: 1 },
+        { variantId: " paris-black-m ", size: "M", quantity: 1 },
+        { variantId: "paris-black-m", size: "M", quantity: 1 },
       ],
     });
 
@@ -62,7 +70,7 @@ describe("validateDocument", () => {
     const result = validateDocument({
       type: "EXCHANGE",
       effectiveDate: "2026-07-22",
-      lines: [{ variantId: "paris-black-39", size: 39, quantity: 1 }],
+      lines: [{ variantId: "paris-black-m", size: "M", quantity: 1 }],
     });
 
     expect(result.success).toBe(false);
@@ -78,9 +86,9 @@ describe("validateDocument", () => {
       type: "EXCHANGE",
       effectiveDate: "2026-07-22",
       lines: [
-        { variantId: "paris-black-38", size: 38, quantity: 1, section: "RETURNED" },
-        { variantId: "paris-black-39", size: 39, quantity: 1, section: "REPLACEMENT" },
-        { variantId: "paris-black-40", size: 40, quantity: 1 },
+        { variantId: "paris-black-s", size: "S", quantity: 1, section: "RETURNED" },
+        { variantId: "paris-black-m", size: "M", quantity: 1, section: "REPLACEMENT" },
+        { variantId: "paris-black-l", size: "L", quantity: 1 },
       ],
     });
 
@@ -92,11 +100,11 @@ describe("validateDocument", () => {
     }
   });
 
-  it("rejects non-ISO dates and non-positive sizes", () => {
+  it("rejects non-ISO dates and blank sizes", () => {
     const result = validateDocument({
       type: "SALE",
       effectiveDate: "22-07-2026",
-      lines: [{ variantId: "paris-black-39", size: 0, quantity: 1 }],
+      lines: [{ variantId: "paris-black-m", size: "", quantity: 1 }],
     });
 
     expect(result.success).toBe(false);
@@ -104,7 +112,11 @@ describe("validateDocument", () => {
       expect(result.errors).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ path: "effectiveDate", code: "REQUIRED" }),
-          expect.objectContaining({ path: "lines.0.size", code: "INVALID_SIZE" }),
+          expect.objectContaining({
+            path: "lines.0.size",
+            code: "INVALID_SIZE",
+            message: "กรุณาระบุไซซ์รองเท้า",
+          }),
         ]),
       );
     }
@@ -114,7 +126,7 @@ describe("validateDocument", () => {
     const result = validateDocument({
       type: "SALE",
       effectiveDate: "2026-99-99",
-      lines: [{ variantId: "paris-black-39", size: 39, quantity: 1 }],
+      lines: [{ variantId: "paris-black-m", size: "M", quantity: 1 }],
     });
 
     expect(result.success).toBe(false);

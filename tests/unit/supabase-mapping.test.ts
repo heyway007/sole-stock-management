@@ -5,7 +5,7 @@ import {
 } from "@/features/inventory/data/supabase-repository";
 
 describe("Supabase inventory mapping", () => {
-  it("maps decimal sizes, numeric balances, and signed movement lines", () => {
+  it("maps canonical text sizes, numeric balances, and signed movement lines", () => {
     const snapshot = mapInventorySnapshot({
       models: [{ id: "model-1", name: "Paris", active: true }],
       colors: [{ id: "color-1", name: "Black", active: true }],
@@ -49,7 +49,7 @@ describe("Supabase inventory mapping", () => {
     });
 
     expect(snapshot.version).toBe(1);
-    expect(snapshot.variants[0].size).toBe(38.5);
+    expect(snapshot.variants[0].size).toBe("38.5");
     expect(snapshot.balances).toEqual({ "variant-1": 7 });
     expect(snapshot.documents[0].lines).toEqual([
       {

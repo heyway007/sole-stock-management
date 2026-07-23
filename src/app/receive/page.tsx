@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Toast } from "@/components/ui/toast";
 import { DocumentForm, type DocumentMetadata } from "@/features/inventory/components/document-form";
 import { createDocumentLine, DocumentLineEditor, type DocumentLineDraft, type DocumentVariantOption } from "@/features/inventory/components/document-line-editor";
+import { normalizeSizeLabel } from "@/features/inventory/domain/size-label";
 import { DocumentValidationError, validateDocument } from "@/features/inventory/domain/validation";
 import { useInventory } from "@/features/inventory/inventory-provider";
 
@@ -28,7 +29,9 @@ export function ReceivePageContent() {
   async function submit(metadata: DocumentMetadata) {
     const preparedLines = lines.map((line) => {
       const selected = variants.find((variant) => variant.id === line.variantId);
-      const size = line.creatingVariant ? Number(line.newSize) : selected?.size ?? 0;
+      const size = line.creatingVariant
+        ? normalizeSizeLabel(line.newSize) ?? ""
+        : selected?.size ?? "";
       const matching = variants.find((variant) =>
         variant.modelId === line.modelId && variant.colorId === line.colorId && variant.size === size,
       );
@@ -38,7 +41,7 @@ export function ReceivePageContent() {
       type: "RECEIPT" as const,
       ...metadata,
       lines: preparedLines.map(({ draft, size, matching }) => ({
-        variantId: matching?.id ?? (draft.modelId && draft.colorId && size > 0
+        variantId: matching?.id ?? (draft.modelId && draft.colorId && size
           ? `new:${draft.modelId}:${draft.colorId}:${size}`
           : ""),
         size,

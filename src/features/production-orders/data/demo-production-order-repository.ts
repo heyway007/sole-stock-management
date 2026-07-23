@@ -3,6 +3,7 @@ import type {
 } from "@/features/inventory/data/demo-repository";
 import type { InventoryRepository } from "@/features/inventory/data/inventory-repository";
 import type { InventorySnapshot, StockDocument } from "@/features/inventory/domain/types";
+import { normalizeSizeLabel } from "@/features/inventory/domain/size-label";
 import type {
   ProductionOrder,
   ProductionOrderInput,
@@ -276,13 +277,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isProductionOrderLineRecord(value: unknown): value is ProductionOrderLine {
+  const size = isRecord(value) ? normalizeSizeLabel(value.size) : null;
   return isRecord(value)
     && typeof value.id === "string" && value.id.length > 0
     && typeof value.variantId === "string" && value.variantId.length > 0
     && Number.isInteger(value.lineNumber) && (value.lineNumber as number) > 0
     && typeof value.modelName === "string" && value.modelName.length > 0
     && typeof value.colorName === "string" && value.colorName.length > 0
-    && typeof value.size === "number" && Number.isFinite(value.size) && value.size > 0
+    && typeof value.size === "string" && size === value.size
     && Number.isInteger(value.quantity) && (value.quantity as number) > 0;
 }
 

@@ -52,7 +52,7 @@ const openOrder = {
     lineNumber: 1,
     modelName: "Paris",
     colorName: "Black",
-    size: 38,
+    size: "M",
     quantity: 4,
   }],
 } satisfies Json;
@@ -180,5 +180,22 @@ describe("SupabaseProductionOrderRepository", () => {
       asClient(conflictClient),
     );
     await expect(conflictRepository.cancel("order-1")).rejects.toThrow("ใบผลิตนี้รับเข้าสต๊อกแล้ว");
+  });
+
+  it("rejects numeric size responses after the text-size migration boundary", async () => {
+    const client = new ContractClient();
+    client.rpcResults.push({
+      data: [{ ...openOrder, lines: [{ ...openOrder.lines[0], size: 38 }] }],
+      error: null,
+    });
+    const repository = new SupabaseProductionOrderRepository(
+      "https://example.supabase.co",
+      "anon",
+      asClient(client),
+    );
+
+    await expect(repository.load()).rejects.toThrow(
+      "ข้อมูลใบผลิตจากเซิร์ฟเวอร์ไม่ถูกต้อง",
+    );
   });
 });

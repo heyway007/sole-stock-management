@@ -32,7 +32,7 @@ const order: ProductionOrder = {
       lineNumber: 1,
       modelName: "Paris",
       colorName: "Black",
-      size: 38,
+      size: "M",
       quantity: 4,
     },
     {
@@ -41,7 +41,7 @@ const order: ProductionOrder = {
       lineNumber: 2,
       modelName: "Paris",
       colorName: "Black",
-      size: 38.5,
+      size: "L",
       quantity: 6,
     },
   ],

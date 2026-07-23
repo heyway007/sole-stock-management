@@ -40,7 +40,7 @@ const openOrder: ProductionOrder = {
     lineNumber: 1,
     modelName: "Paris",
     colorName: "Black",
-    size: 38,
+    size: "M",
     quantity: 4,
   }],
 };

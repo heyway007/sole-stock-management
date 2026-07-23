@@ -217,14 +217,14 @@ describe("DemoInventoryRepository", () => {
     const color = await first.addColor("White");
 
     const [created, concurrent] = await Promise.all([
-      first.ensureVariant(model.id, color.id, 44.5),
-      second.ensureVariant(model.id, color.id, 44.5),
+      first.ensureVariant(model.id, color.id, "44.5"),
+      second.ensureVariant(model.id, color.id, "44.5"),
     ]);
 
     const snapshot = await new DemoInventoryRepository(storage).load();
     expect(concurrent.id).toBe(created.id);
     expect(snapshot.variants.filter((variant) =>
-      variant.modelId === model.id && variant.colorId === color.id && variant.size === 44.5,
+      variant.modelId === model.id && variant.colorId === color.id && variant.size === "44.5",
     )).toEqual([created]);
     expect(snapshot.balances[created.id]).toBe(0);
   });

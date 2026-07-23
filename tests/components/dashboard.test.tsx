@@ -30,7 +30,7 @@ describe("Dashboard", () => {
       type: "RECEIPT",
       effectiveDate: "2026-07-22",
       reference: "PO-1001",
-      lines: [{ variantId: "paris-black-38.5", size: 38.5, quantity: 5 }],
+      lines: [{ variantId: "paris-black-38.5", size: "38.5", quantity: 5 }],
     });
   });
 

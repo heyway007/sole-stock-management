@@ -14,7 +14,7 @@ interface InventoryContextValue {
   refresh(): Promise<void>;
   postDocument(input: StockDocumentInput): Promise<StockDocument>;
   clearStock(effectiveDate: string): Promise<StockDocument | null>;
-  ensureVariant(modelId: string, colorId: string, size: number): Promise<ProductVariant>;
+  ensureVariant(modelId: string, colorId: string, size: string): Promise<ProductVariant>;
   saveLowStockThreshold(variantId: string, threshold: number): Promise<void>;
   catalog: Pick<InventoryRepository,
     "addModel" | "renameModel" | "setModelActive" |
@@ -121,7 +121,7 @@ export function InventoryProvider({ children, factoryOptions, repository }: Inve
     [runMutation],
   );
   const ensureVariant = useCallback(
-    (modelId: string, colorId: string, size: number) =>
+    (modelId: string, colorId: string, size: string) =>
       runMutation((repository) => repository.ensureVariant(modelId, colorId, size)),
     [runMutation],
   );
