@@ -119,15 +119,24 @@ test("demo inventory workflow stays accurate on desktop and routes stay usable o
     await expect(page.getByRole("heading", { level: 1, name: "รับสินค้า" })).toBeVisible();
     const receiveEditor = page.getByRole("region", { name: "รายการสินค้า" });
     await page.getByLabel("เลขอ้างอิง").fill("E2E-RECEIVE");
-    await chooseVariant(receiveEditor, 1, { model: "Paris", color: "Black", size: "38", quantity: "3" });
+    await chooseVariant(receiveEditor, 1, { model: "Paris", color: "Black", size: "XS", quantity: "3" });
+    await expect(receiveEditor.getByLabel("ไซซ์ รายการ 1").locator('option[value="M"]'))
+      .toHaveText("M — EU 39–40 · 24–24.5 cm");
     await receiveEditor.getByRole("button", { name: "เพิ่มรายการ" }).click();
-    await chooseVariant(receiveEditor, 2, { model: "Paris", color: "Black", size: "38.5", quantity: "4" });
+    await chooseVariant(receiveEditor, 2, { model: "Paris", color: "Black", size: "S", quantity: "4" });
     await receiveEditor.getByRole("button", { name: "เพิ่มรายการ" }).click();
     await receiveEditor.getByLabel("รุ่นสินค้า รายการ 3").selectOption({ label: "E2E Runner" });
     await receiveEditor.getByLabel("สีสินค้า รายการ 3").selectOption({ label: "E2E White" });
     await receiveEditor.getByLabel("ไซซ์ รายการ 3").selectOption("__new__");
-    await receiveEditor.getByLabel("ไซซ์ใหม่ รายการ 3").fill("44.5");
+    await expect(receiveEditor.getByLabel("ไซซ์ใหม่ รายการ 3")).toHaveAttribute("type", "text");
+    await receiveEditor.getByLabel("ไซซ์ใหม่ รายการ 3").fill("free");
     await receiveEditor.getByLabel("จำนวน (คู่) รายการ 3").fill("2");
+    await receiveEditor.getByRole("button", { name: "เพิ่มรายการ" }).click();
+    await receiveEditor.getByLabel("รุ่นสินค้า รายการ 4").selectOption({ label: "Weave" });
+    await receiveEditor.getByLabel("สีสินค้า รายการ 4").selectOption({ label: "Black" });
+    await expect(receiveEditor.getByLabel("ไซซ์ รายการ 4").locator('option[value="42"]'))
+      .toHaveText("42 — 26–26.5 cm");
+    await receiveEditor.getByRole("button", { name: "ลบรายการ 4" }).click();
     await page.getByRole("button", { name: "บันทึกรับสินค้า" }).click();
     await expect(page.getByRole("status", { name: "บันทึกสำเร็จ" })).toContainText("รับสินค้าเรียบร้อย");
 
@@ -140,11 +149,11 @@ test("demo inventory workflow stays accurate on desktop and routes stay usable o
     await page.getByLabel("หมายเหตุ").fill("ผลิตเติมสต๊อกสำหรับ E2E");
     const productionEditor = page.getByRole("region", { name: "รายการสั่งผลิต" });
     await chooseVariant(productionEditor, 1, {
-      model: "E2E Runner", color: "E2E White", size: "44.5", quantity: "6",
+      model: "E2E Runner", color: "E2E White", size: "FREE", quantity: "6",
     });
     await productionEditor.getByRole("button", { name: "เพิ่มรายการ" }).click();
     await chooseVariant(productionEditor, 2, {
-      model: "Paris", color: "Black", size: "38", quantity: "5",
+      model: "Paris", color: "Black", size: "M", quantity: "5",
     });
     await page.getByRole("button", { name: "บันทึกใบผลิต" }).click();
 
@@ -166,6 +175,9 @@ test("demo inventory workflow stays accurate on desktop and routes stay usable o
     await expect(page.getByRole("heading", { level: 1, name: "ใบผลิตออเดอร์" })).toBeVisible();
     await expect(page.locator(".production-print-page")).toContainText(firstOrderNumber);
     await expect(page.locator(".production-print-page")).toContainText("E2E Runner");
+    await expect(page.locator(".production-print-page")).toContainText("FREE");
+    await expect(page.locator(".production-print-page")).toContainText("M");
+    await expect(page.locator(".production-print-page")).not.toContainText("24–24.5 cm");
     await expect(page.locator(".production-print-page")).toContainText("11 คู่");
     await page.emulateMedia({ media: "print" });
     await expect(page.locator(".sidebar")).toBeHidden();
@@ -196,7 +208,7 @@ test("demo inventory workflow stays accurate on desktop and routes stay usable o
     await page.getByRole("link", { name: "สร้างใบผลิต" }).click();
     await page.getByLabel("วันที่กำหนดรับ").fill(localDateAfter(10));
     await chooseVariant(page.getByRole("region", { name: "รายการสั่งผลิต" }), 1, {
-      model: "Paris", color: "Black", size: "38", quantity: "4",
+      model: "Paris", color: "Black", size: "M", quantity: "4",
     });
     await page.getByRole("button", { name: "บันทึกใบผลิต" }).click();
     const cancelledOrderHeading = page.getByRole("heading", { level: 1 });
@@ -214,10 +226,10 @@ test("demo inventory workflow stays accurate on desktop and routes stay usable o
 
     await mainNavigation.getByRole("link", { name: "สินค้าคงคลัง" }).click();
     const productionInventory = page.getByRole("table", { name: "สินค้าคงคลัง" });
-    const producedSize38 = productionInventory.getByRole("row").filter({ hasText: "Paris" }).filter({ hasText: "Black" })
-      .filter({ has: page.getByRole("cell", { name: "38", exact: true }) });
+    const producedSizeM = productionInventory.getByRole("row").filter({ hasText: "Paris" }).filter({ hasText: "Black" })
+      .filter({ has: page.getByRole("cell", { name: "M", exact: true }) });
     const producedRunner = productionInventory.getByRole("row").filter({ hasText: "E2E Runner" }).filter({ hasText: "E2E White" });
-    await expect(producedSize38.getByRole("cell", { name: "10 คู่", exact: true })).toBeVisible();
+    await expect(producedSizeM.getByRole("cell", { name: "15 คู่", exact: true })).toBeVisible();
     await expect(producedRunner.getByRole("cell", { name: "8 คู่", exact: true })).toBeVisible();
 
     await mainNavigation.getByRole("link", { name: "นำสินค้าออก" }).click();
@@ -225,7 +237,7 @@ test("demo inventory workflow stays accurate on desktop and routes stay usable o
     await page.getByLabel("เลขอ้างอิง").fill("E2E-SALE");
     await page.getByLabel("เหตุผลการนำออก").selectOption("SALE");
     await chooseVariant(page.getByRole("region", { name: "รายการสินค้า" }), 1, {
-      model: "Paris", color: "Black", size: "38", quantity: "1",
+      model: "Paris", color: "Black", size: "XS", quantity: "1",
     });
     await page.getByRole("button", { name: "บันทึกการนำออก" }).click();
     await expect(page.getByRole("status", { name: "บันทึกสำเร็จ" })).toContainText("นำสินค้าออกเรียบร้อย");
@@ -234,10 +246,10 @@ test("demo inventory workflow stays accurate on desktop and routes stay usable o
     await expect(page.getByRole("heading", { level: 1, name: "เปลี่ยนสินค้า" })).toBeVisible();
     await page.getByLabel("เลขอ้างอิง").fill("E2E-EXCHANGE");
     await chooseVariant(page.getByRole("region", { name: "สินค้าที่รับคืน" }), 1, {
-      model: "Paris", color: "Black", size: "38", quantity: "1",
+      model: "Paris", color: "Black", size: "XS", quantity: "1",
     });
     await chooseVariant(page.getByRole("region", { name: "สินค้าที่ส่งทดแทน" }), 1, {
-      model: "Paris", color: "Black", size: "38.5", quantity: "1",
+      model: "Paris", color: "Black", size: "S", quantity: "1",
     });
     await page.getByRole("button", { name: "ตรวจสอบการเปลี่ยน" }).click();
     const exchangeDialog = page.getByRole("dialog", { name: "ยืนยันการเปลี่ยนสินค้า" });
@@ -261,14 +273,14 @@ test("demo inventory workflow stays accurate on desktop and routes stay usable o
     await mainNavigation.getByRole("link", { name: "สินค้าคงคลัง" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "สินค้าคงคลัง" })).toBeVisible();
     const inventory = page.getByRole("table", { name: "สินค้าคงคลัง" });
-    const size38 = inventory.getByRole("row").filter({ hasText: "Paris" }).filter({ hasText: "Black" })
-      .filter({ has: page.getByRole("cell", { name: "38", exact: true }) });
-    const size385 = inventory.getByRole("row").filter({ hasText: "Paris" }).filter({ hasText: "Black" })
-      .filter({ has: page.getByRole("cell", { name: "38.5", exact: true }) });
-    await expect(size38.getByRole("cell", { name: "10 คู่", exact: true })).toBeVisible();
-    await expect(size385.getByRole("cell", { name: "12 คู่", exact: true })).toBeVisible();
+    const sizeXs = inventory.getByRole("row").filter({ hasText: "Paris" }).filter({ hasText: "Black" })
+      .filter({ has: page.getByRole("cell", { name: "XS", exact: true }) });
+    const sizeS = inventory.getByRole("row").filter({ hasText: "Paris" }).filter({ hasText: "Black" })
+      .filter({ has: page.getByRole("cell", { name: "S", exact: true }) });
+    await expect(sizeXs.getByRole("cell", { name: "5 คู่", exact: true })).toBeVisible();
+    await expect(sizeS.getByRole("cell", { name: "12 คู่", exact: true })).toBeVisible();
     const newVariant = inventory.getByRole("row").filter({ hasText: "E2E Runner" }).filter({ hasText: "E2E White" });
-    await expect(newVariant.getByRole("cell", { name: "44.5", exact: true })).toBeVisible();
+    await expect(newVariant.getByRole("cell", { name: "FREE", exact: true })).toBeVisible();
     await expect(newVariant.getByRole("cell", { name: "8 คู่", exact: true })).toBeVisible();
 
     const inventorySummary = page.getByRole("group", { name: "สรุปสินค้าคงคลัง" });
@@ -307,7 +319,14 @@ test("demo inventory workflow stays accurate on desktop and routes stay usable o
   await expect(page.getByRole("heading", { level: 1, name: "รับสินค้า" })).toBeVisible();
   const mobileReceiveEditor = page.getByRole("region", { name: "รายการสินค้า" });
   await page.getByLabel("เลขอ้างอิง").fill("E2E-MOBILE");
-  await chooseVariant(mobileReceiveEditor, 1, { model: "Paris", color: "Black", size: "38", quantity: "1" });
+  await mobileReceiveEditor.getByLabel("รุ่นสินค้า รายการ 1").selectOption({ label: "Paris" });
+  await mobileReceiveEditor.getByLabel("สีสินค้า รายการ 1").selectOption({ label: "Black" });
+  await mobileReceiveEditor.getByLabel("ไซซ์ รายการ 1").selectOption("__new__");
+  const mobileCustomSize = mobileReceiveEditor.getByLabel("ไซซ์ใหม่ รายการ 1");
+  await expectTouchTarget(page, mobileCustomSize);
+  await expect(mobileCustomSize).toHaveAttribute("type", "text");
+  await mobileCustomSize.fill("m/l");
+  await mobileReceiveEditor.getByLabel("จำนวน (คู่) รายการ 1").fill("1");
   await page.getByRole("button", { name: "บันทึกรับสินค้า" }).click();
   await expect(page.getByRole("status", { name: "บันทึกสำเร็จ" })).toContainText("รับสินค้าเรียบร้อย");
   // The Next.js development toolbar occupies the bottom-left corner where the
@@ -357,7 +376,7 @@ test("demo inventory workflow stays accurate on desktop and routes stay usable o
       await expect(page.getByRole("heading", { level: 1, name: "สร้างใบผลิตออเดอร์" })).toBeVisible();
       await page.getByLabel("วันที่กำหนดรับ").fill(localDateAfter(7));
       await chooseVariant(page.getByRole("region", { name: "รายการสั่งผลิต" }), 1, {
-        model: "Paris", color: "Black", size: "38", quantity: "1",
+        model: "Paris", color: "Black", size: "M", quantity: "1",
       });
       await page.getByRole("button", { name: "บันทึกใบผลิต" }).click();
       await expect(page.getByRole("heading", { level: 1 })).toHaveText(/^PO-/);

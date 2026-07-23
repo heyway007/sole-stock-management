@@ -35,7 +35,7 @@ Copy-Item .env.example .env.local
 ## Supabase setup and switching
 
 1. สร้าง Supabase project สำหรับข้อมูลที่ไม่อ่อนไหว
-2. Apply migration ใน [`supabase/migrations`](supabase/migrations) ตามลำดับชื่อไฟล์ (รวม forward migration `202607220002_variant_and_retry_reconciliation.sql`) ผ่าน SQL Editor ของ Supabase หรือ link project แล้วรัน:
+2. Apply migration ใน [`supabase/migrations`](supabase/migrations) ตามลำดับชื่อไฟล์ รวม migration `202607230005_text_size_profiles.sql` ผ่าน SQL Editor ของ Supabase หรือ link project แล้วรัน:
 
    ```powershell
    npx supabase link --project-ref <project-ref>
@@ -52,9 +52,31 @@ Copy-Item .env.example .env.local
 
 Repository factory จะเลือก Supabase เฉพาะเมื่อ backend flag, URL และ anonymous key ครบทั้งสามค่า หากค่าใดหายไป แอปจะ fallback เป็น demo repository เพื่อคงค่าเริ่มต้นที่ปลอดภัยและเปิดใช้งานได้โดยไม่ต้องตั้งค่า
 
-### Creating the first size variant
+### Shoe sizes and creating a new size
 
-เพิ่มรุ่นและสีที่หน้า `/catalog` ก่อน จากนั้นไปที่ `/receive` เลือกรุ่นและสี เลือก `เพิ่มไซซ์ใหม่` ในช่องไซซ์ แล้วกรอกไซซ์ทศนิยมหนึ่งตำแหน่งและจำนวนรับเข้า การบันทึกจะสร้าง model-color-size variant ที่ยังไม่มีด้วยยอดตั้งต้น 0 แล้วรับสินค้าใน workflow เดียวกัน หาก variant เดิมมีอยู่แล้ว ระบบจะนำกลับมาใช้แทนการสร้างซ้ำ
+ไซซ์มาตรฐานของ Paris/Castor คือ XS–3XL และ Weave คือ 39–45 ช่องเลือกจะแสดงช่วง EU/ความยาวเท้าเพื่อช่วยเลือก แต่ตารางสต๊อก ประวัติ ใบผลิต และเอกสารพิมพ์จะแสดงชื่อไซซ์แบบสั้น
+
+| Paris / Castor | EU | ความยาวฝ่าเท้า |
+| --- | --- | --- |
+| XS | 36–37 | 22–22.5 cm |
+| S | 37–38 | 23–23.5 cm |
+| M | 39–40 | 24–24.5 cm |
+| L | 40–41 | 25–25.5 cm |
+| XL | 42–43 | 26–26.5 cm |
+| 2XL | 44–45 | 27–27.5 cm |
+| 3XL | 45–46 | 28–28.5 cm |
+
+| Weave | ความยาวฝ่าเท้า |
+| --- | --- |
+| 39 | 23–23.5 cm |
+| 40 | 24–24.5 cm |
+| 41 | 25–25.5 cm |
+| 42 | 26–26.5 cm |
+| 43 | 26.5–27 cm |
+| 44 | 27–27.5 cm |
+| 45 | 28–28.5 cm |
+
+เมื่อต้องการไซซ์อื่น ให้เพิ่มรุ่นและสีที่หน้า `/catalog` ก่อน จากนั้นไปที่ `/receive` เลือกรุ่นและสี เลือก `เพิ่มไซซ์ใหม่` แล้วกรอกข้อความ เช่น `FREE`, `M/L`, `39-40`, `2XL` หรือภาษาไทย ระบบจะตัดช่องว่างส่วนเกิน ปรับตัวอักษรเป็นรูปแบบมาตรฐาน และจำกัดความยาว 24 ตัวอักษร การบันทึกจะสร้าง model-color-size variant ที่ยังไม่มีด้วยยอดตั้งต้น 0 แล้วรับสินค้าใน workflow เดียวกัน หาก variant เดิมมีอยู่แล้ว ระบบจะนำกลับมาใช้แทนการสร้างซ้ำ
 
 ในโหมด Supabase การสร้าง variant ทำผ่าน `ensure_product_variant` RPC แบบ atomic และ idempotent ภายใต้ unique model-color-size constraint ส่วน browser roles ยังคงไม่มีสิทธิ์ insert ตาราง `product_variants` โดยตรง
 
@@ -93,3 +115,4 @@ npm run e2e -- tests/e2e/inventory.spec.ts
 | `/exchange` | รับคืนและส่งสินค้าทดแทนแบบ atomic exchange |
 | `/history` | ตรวจเอกสารและ signed movement lines ย้อนหลัง |
 | `/catalog` | เพิ่ม เปลี่ยนชื่อ เปิด หรือปิดใช้รุ่นและสี |
+| `/production-orders` | สร้าง แก้ไข พิมพ์ ยกเลิก และรับใบผลิตเข้าสต๊อก |

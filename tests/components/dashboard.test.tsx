@@ -30,7 +30,7 @@ describe("Dashboard", () => {
       type: "RECEIPT",
       effectiveDate: "2026-07-22",
       reference: "PO-1001",
-      lines: [{ variantId: "paris-black-38.5", size: "38.5", quantity: 5 }],
+      lines: [{ variantId: "paris-black-s", size: "S", quantity: 5 }],
     });
   });
 
@@ -74,7 +74,7 @@ describe("Dashboard", () => {
     const lowStock = await screen.findByRole("region", { name: "สินค้าที่ต้องเติม" });
     const parisBlack = within(lowStock).getByText("Paris / Black").closest("article");
     expect(parisBlack).not.toBeNull();
-    expect(within(parisBlack!).getByText("ไซซ์ 38")).toBeInTheDocument();
+    expect(within(parisBlack!).getByText("ไซซ์ XS")).toBeInTheDocument();
 
     const recent = screen.getByRole("region", { name: "รายการล่าสุด" });
     expect(within(recent).getByText("STK-20260722-0001")).toBeInTheDocument();
