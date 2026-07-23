@@ -11,6 +11,7 @@ import type {
   ProductionOrderLineInput,
   ProductionOrderReceiptResult,
 } from "../domain/types";
+import { amountToMinor } from "../domain/money";
 import {
   ProductionOrderValidationException,
   validateProductionOrder,
@@ -270,6 +271,7 @@ function snapshotLine(
     colorName: color.name,
     size: variant.size,
     quantity: input.quantity,
+    unitPrice: input.unitPrice,
   };
 }
 
@@ -286,7 +288,9 @@ function isProductionOrderLineRecord(value: unknown): value is ProductionOrderLi
     && typeof value.modelName === "string" && value.modelName.length > 0
     && typeof value.colorName === "string" && value.colorName.length > 0
     && typeof value.size === "string" && size === value.size
-    && Number.isInteger(value.quantity) && (value.quantity as number) > 0;
+    && Number.isInteger(value.quantity) && (value.quantity as number) > 0
+    && (value.unitPrice === null
+      || (typeof value.unitPrice === "number" && amountToMinor(value.unitPrice) !== null));
 }
 
 function isProductionOrderRecord(value: unknown): value is ProductionOrder {
@@ -359,7 +363,8 @@ function projectDemoState(value: unknown): DemoState | null {
       lines: candidate.lines.map((line) => {
         if (!isRecord(line)) return line;
         const size = normalizeSizeLabel(line.size);
-        return size ? { ...line, size } : line;
+        const unitPrice = "unitPrice" in line ? line.unitPrice : null;
+        return size ? { ...line, size, unitPrice } : line;
       }),
     };
   });

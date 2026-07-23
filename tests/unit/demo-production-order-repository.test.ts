@@ -35,6 +35,7 @@ async function fixtureWithOpenOrder() {
     lines: snapshot.variants.slice(0, 2).map((variant, index) => ({
       variantId: variant.id,
       quantity: index + 4,
+      unitPrice: 300 + index,
     })),
   });
   return { storage, inventory, repository, order };
@@ -56,7 +57,7 @@ describe("DemoProductionOrderRepository", () => {
       orderDate: "2026-07-22",
       expectedDate: "2026-08-05",
       note: "รอบแรก",
-      lines: [{ variantId: first.id, quantity: 4 }],
+      lines: [{ variantId: first.id, quantity: 4, unitPrice: 327.5 }],
     });
     expect(created).toMatchObject({
       number: "PO-20260722-000001",
@@ -67,6 +68,7 @@ describe("DemoProductionOrderRepository", () => {
       colorName: "Black",
       size: "XS",
       quantity: 4,
+      unitPrice: 327.5,
     });
 
     const edited = await repository.save({
@@ -74,7 +76,7 @@ describe("DemoProductionOrderRepository", () => {
       orderDate: created.orderDate,
       expectedDate: "2026-08-08",
       note: "แก้แล้ว",
-      lines: [{ variantId: second.id, quantity: 6 }],
+      lines: [{ variantId: second.id, quantity: 6, unitPrice: 265 }],
     });
     expect(edited).toMatchObject({
       id: created.id,
@@ -87,7 +89,11 @@ describe("DemoProductionOrderRepository", () => {
       orderDate: edited.orderDate,
       expectedDate: edited.expectedDate,
       note: edited.note,
-      lines: edited.lines.map((line) => ({ variantId: line.variantId, quantity: line.quantity })),
+      lines: edited.lines.map((line) => ({
+        variantId: line.variantId,
+        quantity: line.quantity,
+        unitPrice: line.unitPrice ?? 1,
+      })),
     })).rejects.toThrow("แก้ไขได้เฉพาะใบผลิตที่รอรับเข้า");
   });
 
@@ -125,7 +131,7 @@ describe("DemoProductionOrderRepository", () => {
       orderDate: "2026-07-22",
       expectedDate: "2026-07-22",
       note: "",
-      lines: [{ variantId: variant.id, quantity: 1 }],
+      lines: [{ variantId: variant.id, quantity: 1, unitPrice: 100 }],
     });
     expect(JSON.parse(storage.getItem(PRODUCTION_ORDER_STORAGE_KEY) ?? "null")).toMatchObject({
       version: 1,
@@ -140,11 +146,12 @@ describe("DemoProductionOrderRepository", () => {
     ) as {
       orders: Array<{
         id: string;
-        lines: Array<{ id: string; size: string | number }>;
+        lines: Array<{ id: string; size: string | number; unitPrice?: number }>;
       }>;
     };
     const originalLineId = persisted.orders[0].lines[0].id;
     persisted.orders[0].lines[0].size = 38;
+    delete persisted.orders[0].lines[0].unitPrice;
     storage.setItem(PRODUCTION_ORDER_STORAGE_KEY, JSON.stringify(persisted));
 
     const loaded = await new DemoProductionOrderRepository(
@@ -156,6 +163,7 @@ describe("DemoProductionOrderRepository", () => {
     expect(loaded[0].lines[0]).toMatchObject({
       id: originalLineId,
       size: "38",
+      unitPrice: null,
     });
   });
 });
