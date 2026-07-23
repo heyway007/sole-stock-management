@@ -38,7 +38,8 @@ const order: ProductionOrder = {
 };
 
 class StaticRepository implements ProductionOrderRepository {
-  async load() { return [structuredClone(order)]; }
+  constructor(private readonly value: ProductionOrder = order) {}
+  async load() { return [structuredClone(this.value)]; }
   async save(): Promise<ProductionOrder> { throw new Error("not used"); }
   async cancel(): Promise<ProductionOrder> { throw new Error("not used"); }
   async receive(): Promise<ProductionOrderReceiptResult> { throw new Error("not used"); }
@@ -61,9 +62,32 @@ describe("ProductionOrderDetailPage", () => {
     const table = screen.getByRole("table", { name: "รายการในใบผลิต" });
     expect(within(table).getByText("M")).toBeInTheDocument();
     expect(table).not.toHaveTextContent("24–24.5 cm");
-    expect(screen.getByText("รวม 2 รายการ · 10 คู่")).toBeInTheDocument();
+    expect(within(table).getByText("327.00 บาท")).toBeInTheDocument();
+    expect(within(table).getByText("1,308.00 บาท")).toBeInTheDocument();
+    expect(screen.getByText(/ยอดรวมสุทธิ 2,898.00 บาท/)).toBeInTheDocument();
     expect(screen.getByText("ส่งก่อนเที่ยง")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "พิมพ์ใบผลิต" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "รับเข้าสต๊อก" })).toBeInTheDocument();
+  });
+
+  it("shows incomplete pricing for a legacy order without inventing a zero", async () => {
+    const legacyOrder: ProductionOrder = {
+      ...order,
+      lines: order.lines.map((line, index) =>
+        index === 0 ? { ...line, unitPrice: null } : line),
+    };
+    const storage = new MemoryStorage();
+    render(
+      <InventoryProvider repository={new DemoInventoryRepository(storage)}>
+        <ProductionOrderProvider repository={new StaticRepository(legacyOrder)}>
+          <ProductionOrderDetailPageContent />
+        </ProductionOrderProvider>
+      </InventoryProvider>,
+    );
+
+    await screen.findByRole("heading", { name: "PO-20260722-000001" });
+    expect(screen.getAllByText("—").length).toBeGreaterThan(0);
+    expect(screen.getByText("ข้อมูลราคายังไม่ครบ")).toBeInTheDocument();
+    expect(screen.queryByText(/ยอดรวมสุทธิ 0.00 บาท/)).not.toBeInTheDocument();
   });
 });

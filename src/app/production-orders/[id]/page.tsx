@@ -7,6 +7,11 @@ import { Button } from "@/components/ui/button";
 import { ProductionOrderActions } from "@/features/production-orders/components/production-order-actions";
 import { ProductionOrderStatus } from "@/features/production-orders/components/production-order-status";
 import { summarizeProductionOrder } from "@/features/production-orders/domain/selectors";
+import {
+  amountToMinor,
+  formatBahtMinor,
+  lineTotalMinor,
+} from "@/features/production-orders/domain/money";
 import { useProductionOrders } from "@/features/production-orders/production-order-provider";
 import { useInventory } from "@/features/inventory/inventory-provider";
 
@@ -64,14 +69,40 @@ export function ProductionOrderDetailPageContent() {
       <section className="production-detail-lines" aria-label="รายการสินค้าในใบผลิต">
         <div className="inventory-table-wrap production-detail-table-wrap">
           <table className="inventory-table" aria-label="รายการในใบผลิต">
-            <thead><tr><th>#</th><th>รุ่น</th><th>สี</th><th>ไซซ์</th><th>จำนวน</th></tr></thead>
-            <tbody>{order.lines.map((line) => <tr key={line.id}><td>{line.lineNumber}</td><td><strong>{line.modelName}</strong></td><td>{line.colorName}</td><td>{line.size}</td><td><strong>{line.quantity}</strong> คู่</td></tr>)}</tbody>
+            <thead><tr><th>#</th><th>รุ่น</th><th>สี</th><th>ไซซ์</th><th>จำนวน</th><th>ราคา/หน่วย</th><th>จำนวนเงิน</th></tr></thead>
+            <tbody>{order.lines.map((line) => (
+              <tr key={line.id}>
+                <td>{line.lineNumber}</td>
+                <td><strong>{line.modelName}</strong></td>
+                <td>{line.colorName}</td>
+                <td>{line.size}</td>
+                <td><strong>{line.quantity}</strong> คู่</td>
+                <td className="production-money-cell">{formatBahtMinor(amountToMinor(line.unitPrice))}</td>
+                <td className="production-money-cell">{formatBahtMinor(lineTotalMinor(line.quantity, line.unitPrice))}</td>
+              </tr>
+            ))}</tbody>
           </table>
         </div>
         <div className="production-detail-line-cards" role="list" aria-label="รายการในใบผลิตสำหรับมือถือ">
-          {order.lines.map((line) => <article role="listitem" key={line.id}><div><strong>{line.modelName} / {line.colorName}</strong><span>ไซซ์ {line.size}</span></div><strong>{line.quantity} คู่</strong></article>)}
+          {order.lines.map((line) => (
+            <article role="listitem" key={line.id}>
+              <div>
+                <strong>{line.modelName} / {line.colorName}</strong>
+                <span>ไซซ์ {line.size}</span>
+                <span>ราคา/หน่วย {formatBahtMinor(amountToMinor(line.unitPrice))}</span>
+              </div>
+              <div className="production-card-amount">
+                <span>{line.quantity} คู่</span>
+                <strong>{formatBahtMinor(lineTotalMinor(line.quantity, line.unitPrice))}</strong>
+              </div>
+            </article>
+          ))}
         </div>
-        <footer>รวม {summary.lineCount} รายการ · {summary.totalPairs} คู่</footer>
+        <footer>
+          <span>รวม {summary.lineCount} รายการ · {summary.totalPairs} คู่</span>
+          <strong>ยอดรวมสุทธิ {formatBahtMinor(summary.totalAmountMinor)}</strong>
+          {!summary.hasCompletePricing && <small>ข้อมูลราคายังไม่ครบ</small>}
+        </footer>
       </section>
     </div>
   );

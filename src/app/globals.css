@@ -521,7 +521,11 @@ button, input, select { font: inherit; }
 .production-detail-line-cards article > div { min-width: 0; display: grid; gap: 2px; }
 .production-detail-line-cards article span { color: var(--muted); font-size: 0.78rem; }
 .production-detail-line-cards article > strong { white-space: nowrap; }
-.production-detail-lines > footer { border-radius: 13px; color: var(--forest-800); background: var(--green-100); padding: 12px 15px; text-align: right; font-weight: 800; }
+.production-money-cell { white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
+.production-card-amount { display: grid; justify-items: end; gap: 2px; white-space: nowrap; }
+.production-card-amount span { color: var(--muted); font-size: 0.78rem; }
+.production-detail-lines > footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px 16px; border-radius: 13px; color: var(--forest-800); background: var(--green-100); padding: 12px 15px; text-align: right; font-weight: 800; }
+.production-detail-lines > footer small { flex-basis: 100%; color: #a44b2b; }
 
 @media (max-width: 599px) {
   .production-order-actions .button { width: 100%; }
