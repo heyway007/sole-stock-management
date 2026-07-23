@@ -180,7 +180,8 @@ export class DemoProductionOrderRepository implements ProductionOrderRepository 
     if (!raw) return emptyState();
     try {
       const parsed: unknown = JSON.parse(raw);
-      return isDemoState(parsed) ? structuredClone(parsed) : emptyState();
+      const projected = projectDemoState(parsed);
+      return projected ? structuredClone(projected) : emptyState();
     } catch {
       return emptyState();
     }
@@ -344,4 +345,24 @@ function isDemoState(value: unknown): value is DemoState {
     && !!state.receipts
     && typeof state.receipts === "object"
     && Object.values(state.receipts).every(isStockDocumentRecord);
+}
+
+function projectDemoState(value: unknown): DemoState | null {
+  if (!isRecord(value) || !Array.isArray(value.orders)) return null;
+
+  const orders = value.orders.map((candidate) => {
+    if (!isRecord(candidate) || !Array.isArray(candidate.lines)) {
+      return candidate;
+    }
+    return {
+      ...candidate,
+      lines: candidate.lines.map((line) => {
+        if (!isRecord(line)) return line;
+        const size = normalizeSizeLabel(line.size);
+        return size ? { ...line, size } : line;
+      }),
+    };
+  });
+  const projected = { ...value, orders };
+  return isDemoState(projected) ? projected : null;
 }

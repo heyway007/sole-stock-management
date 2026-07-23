@@ -1,6 +1,5 @@
 import type { InventorySnapshot, ProductVariant } from "@/features/inventory/domain/types";
-
-const sizes = [38, 38.5, 39, 40, 41, 42, 43.5] as const;
+import { sizeProfileForModel } from "@/features/inventory/domain/size-label";
 
 const catalog = [
   ["paris", "Paris", "black", "Black"],
@@ -14,10 +13,13 @@ const catalog = [
   ["weave", "Weave", "sand", "Sand"],
 ] as const;
 
-function buildVariant(modelId: string, colorId: string, numericSize: number): ProductVariant {
-  const size = String(numericSize);
+function sizeIdPart(size: string): string {
+  return encodeURIComponent(size.toLocaleLowerCase("en-US"));
+}
+
+function buildVariant(modelId: string, colorId: string, size: string): ProductVariant {
   return {
-    id: `${modelId}-${colorId}-${size}`,
+    id: `${modelId}-${colorId}-${sizeIdPart(size)}`,
     modelId,
     colorId,
     size,
@@ -33,8 +35,10 @@ export function createSeedSnapshot(): InventorySnapshot {
   const colors = Array.from(new Map(catalog.map(([, , colorId, name]) => [colorId, name])).entries()).map(
     ([id, name]) => ({ id, name, active: true }),
   );
-  const variants = catalog.flatMap(([modelId, , colorId]) =>
-    sizes.map((size) => buildVariant(modelId, colorId, size)),
+  const variants = catalog.flatMap(([modelId, modelName, colorId]) =>
+    sizeProfileForModel(modelName).map((entry) =>
+      buildVariant(modelId, colorId, entry.label),
+    ),
   );
   const balances = Object.fromEntries(
     variants.map((variant, index) => [variant.id, index % 7 === 0 ? 2 : 8 + (index % 13)]),

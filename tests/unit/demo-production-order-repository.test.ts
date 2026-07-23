@@ -65,7 +65,7 @@ describe("DemoProductionOrderRepository", () => {
     expect(created.lines[0]).toMatchObject({
       modelName: "Paris",
       colorName: "Black",
-      size: 38,
+      size: "XS",
       quantity: 4,
     });
 
@@ -130,6 +130,32 @@ describe("DemoProductionOrderRepository", () => {
     expect(JSON.parse(storage.getItem(PRODUCTION_ORDER_STORAGE_KEY) ?? "null")).toMatchObject({
       version: 1,
       revision: 1,
+    });
+  });
+
+  it("upgrades legacy numeric line sizes without changing order identities", async () => {
+    const { storage, inventory, order } = await fixtureWithOpenOrder();
+    const persisted = JSON.parse(
+      storage.getItem(PRODUCTION_ORDER_STORAGE_KEY)!,
+    ) as {
+      orders: Array<{
+        id: string;
+        lines: Array<{ id: string; size: string | number }>;
+      }>;
+    };
+    const originalLineId = persisted.orders[0].lines[0].id;
+    persisted.orders[0].lines[0].size = 38;
+    storage.setItem(PRODUCTION_ORDER_STORAGE_KEY, JSON.stringify(persisted));
+
+    const loaded = await new DemoProductionOrderRepository(
+      storage,
+      inventory,
+    ).load();
+
+    expect(loaded[0].id).toBe(order.id);
+    expect(loaded[0].lines[0]).toMatchObject({
+      id: originalLineId,
+      size: "38",
     });
   });
 });

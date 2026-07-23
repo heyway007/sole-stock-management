@@ -150,6 +150,35 @@ function isSnapshot(value: unknown): value is InventorySnapshot {
     && new Set(value.documents.map((document) => document.number)).size === value.documents.length;
 }
 
+function projectPersistedSnapshot(value: unknown): InventorySnapshot | null {
+  if (!isRecord(value) || !Array.isArray(value.variants)) return null;
+
+  const variants = value.variants.map((candidate) => {
+    if (!isRecord(candidate)) return candidate;
+    const size = normalizeSizeLabel(candidate.size);
+    return size ? { ...candidate, size } : candidate;
+  });
+  const identities = new Set<string>();
+  for (const candidate of variants) {
+    if (!isRecord(candidate)
+      || typeof candidate.modelId !== "string"
+      || typeof candidate.colorId !== "string"
+      || typeof candidate.size !== "string") {
+      return null;
+    }
+    const identity = [
+      candidate.modelId,
+      candidate.colorId,
+      candidate.size.toLocaleLowerCase(),
+    ].join("\u0000");
+    if (identities.has(identity)) return null;
+    identities.add(identity);
+  }
+
+  const projected = { ...value, variants };
+  return isSnapshot(projected) ? projected : null;
+}
+
 function normalizedName(name: string): string {
   return name.trim().toLocaleLowerCase("en-US");
 }
@@ -329,8 +358,9 @@ export class DemoInventoryRepository implements InventoryRepository {
     if (stored) {
       try {
         const parsed: unknown = JSON.parse(stored);
-        if (isSnapshot(parsed)) {
-          return cloneSnapshot(parsed);
+        const projected = projectPersistedSnapshot(parsed);
+        if (projected) {
+          return cloneSnapshot(projected);
         }
       } catch {
         // Corrupt persisted data intentionally remains untouched until a successful mutation.

@@ -44,6 +44,41 @@ describe("DemoInventoryRepository", () => {
     expect(snapshot.variants.every((variant) => variant.lowStockThreshold === 3)).toBe(true);
   });
 
+  it("seeds the approved sizes per model", async () => {
+    const snapshot = await new DemoInventoryRepository(new MemoryStorage()).load();
+    const labelsFor = (modelName: string) => {
+      const model = snapshot.models.find((item) => item.name === modelName)!;
+      return [
+        ...new Set(
+          snapshot.variants
+            .filter((variant) => variant.modelId === model.id)
+            .map((variant) => variant.size),
+        ),
+      ];
+    };
+
+    expect(labelsFor("Paris")).toEqual(["XS", "S", "M", "L", "XL", "2XL", "3XL"]);
+    expect(labelsFor("Castor")).toEqual(["XS", "S", "M", "L", "XL", "2XL", "3XL"]);
+    expect(labelsFor("Weave")).toEqual(["39", "40", "41", "42", "43", "44", "45"]);
+  });
+
+  it("upgrades numeric sizes without changing identities or balances", async () => {
+    const storage = new MemoryStorage();
+    const legacy = createSeedSnapshot() as unknown as {
+      variants: Array<{ id: string; size: string | number }>;
+      balances: Record<string, number>;
+    };
+    const originalId = legacy.variants[0].id;
+    const originalBalances = structuredClone(legacy.balances);
+    legacy.variants[0].size = 38;
+    storage.setItem(INVENTORY_STORAGE_KEY, JSON.stringify(legacy));
+
+    const upgraded = await new DemoInventoryRepository(storage).load();
+
+    expect(upgraded.variants[0]).toMatchObject({ id: originalId, size: "38" });
+    expect(upgraded.balances).toEqual(originalBalances);
+  });
+
   it("persists a catalog mutation across repository instances", async () => {
     const storage = new MemoryStorage();
     await new DemoInventoryRepository(storage).addModel("  Runner  ");
