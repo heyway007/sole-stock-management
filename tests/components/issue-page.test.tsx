@@ -44,7 +44,7 @@ describe("IssuePage", () => {
     const user = userEvent.setup();
     const repository = renderIssue();
     await screen.findByRole("heading", { name: "นำสินค้าออก" });
-    await fillLine(user, 1, "38", "1");
+    await fillLine(user, 1, "XS", "1");
     expect(screen.getByText("คงเหลือ 2 คู่")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "บันทึกการนำออก" }));
@@ -63,7 +63,7 @@ describe("IssuePage", () => {
     const repository = renderIssue();
     await screen.findByRole("heading", { name: "นำสินค้าออก" });
     await user.selectOptions(screen.getByRole("combobox", { name: "เหตุผลการนำออก" }), label);
-    await fillLine(user, 1, "38.5", "2");
+    await fillLine(user, 1, "S", "2");
     await user.click(screen.getByRole("button", { name: "บันทึกการนำออก" }));
 
     expect(await screen.findByRole("status", { name: "บันทึกสำเร็จ" })).toHaveTextContent("นำสินค้าออกเรียบร้อย");
@@ -78,13 +78,13 @@ describe("IssuePage", () => {
     await screen.findByRole("heading", { name: "นำสินค้าออก" });
     await user.selectOptions(screen.getByRole("combobox", { name: "เหตุผลการนำออก" }), "ปรับยอด");
     expect(screen.getByRole("combobox", { name: "ทิศทางการปรับยอด" })).toBeInTheDocument();
-    await fillLine(user, 1, "38", "3");
+    await fillLine(user, 1, "XS", "3");
     await user.click(screen.getByRole("button", { name: "บันทึกการนำออก" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("กรุณาเลือกเพิ่มยอดหรือลดยอด");
 
     await user.selectOptions(screen.getByRole("combobox", { name: "ทิศทางการปรับยอด" }), "เพิ่มยอด");
     await user.click(screen.getByRole("button", { name: "เพิ่มรายการ" }));
-    await fillLine(user, 2, "38.5", "2");
+    await fillLine(user, 2, "S", "2");
     await user.click(screen.getByRole("button", { name: "บันทึกการนำออก" }));
     expect(await screen.findByRole("status", { name: "บันทึกสำเร็จ" })).toBeInTheDocument();
     expect(repository.inputs[0]).toMatchObject({
@@ -98,7 +98,7 @@ describe("IssuePage", () => {
     const repository = renderIssue();
     await screen.findByRole("heading", { name: "นำสินค้าออก" });
     await user.selectOptions(screen.getByRole("combobox", { name: "เหตุผลการนำออก" }), "ขาย");
-    await fillLine(user, 1, "38", "3");
+    await fillLine(user, 1, "XS", "3");
     await user.click(screen.getByRole("button", { name: "บันทึกการนำออก" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("จำนวนที่นำออกเกินสต็อกคงเหลือ");
@@ -114,7 +114,7 @@ describe("IssuePage", () => {
     await screen.findByRole("heading", { name: "นำสินค้าออก" });
     await user.selectOptions(screen.getByRole("combobox", { name: "เหตุผลการนำออก" }), "ปรับยอด");
     await user.selectOptions(screen.getByRole("combobox", { name: "ทิศทางการปรับยอด" }), "ลดยอด");
-    await fillLine(user, 1, "38", "1");
+    await fillLine(user, 1, "XS", "1");
 
     await user.click(screen.getByRole("button", { name: "บันทึกการนำออก" }));
 
@@ -131,7 +131,7 @@ describe("IssuePage", () => {
     await screen.findByRole("heading", { name: "นำสินค้าออก" });
     await user.selectOptions(screen.getByRole("combobox", { name: "เหตุผลการนำออก" }), "ปรับยอด");
     await user.selectOptions(screen.getByRole("combobox", { name: "ทิศทางการปรับยอด" }), "ลดยอด");
-    await fillLine(user, 1, "38", "3");
+    await fillLine(user, 1, "XS", "3");
 
     await user.click(screen.getByRole("button", { name: "บันทึกการนำออก" }));
 

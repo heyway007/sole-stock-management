@@ -33,10 +33,10 @@ function renderForm(order?: ProductionOrder) {
   return { onSaved };
 }
 
-async function selectParisBlack38(user: ReturnType<typeof userEvent.setup>) {
+async function selectParisBlackM(user: ReturnType<typeof userEvent.setup>) {
   await user.selectOptions(screen.getByRole("combobox", { name: "รุ่นสินค้า รายการ 1" }), "paris");
   await user.selectOptions(screen.getByRole("combobox", { name: "สีสินค้า รายการ 1" }), "black");
-  await user.selectOptions(screen.getByRole("combobox", { name: "ไซซ์ รายการ 1" }), "38");
+  await user.selectOptions(screen.getByRole("combobox", { name: "ไซซ์ รายการ 1" }), "M");
 }
 
 describe("ProductionOrderForm", () => {
@@ -51,7 +51,7 @@ describe("ProductionOrderForm", () => {
     const orderDate = screen.getByLabelText("วันที่สั่งผลิต");
     expect(screen.getByLabelText("วันที่กำหนดรับ")).toHaveValue((orderDate as HTMLInputElement).value);
 
-    await selectParisBlack38(user);
+    await selectParisBlackM(user);
     await user.type(screen.getByRole("spinbutton", { name: "จำนวน (คู่) รายการ 1" }), "4");
     expect(screen.getByText("รวม 1 รายการ · 4 คู่")).toBeInTheDocument();
     expect(screen.queryByText(/คงเหลือ/)).not.toBeInTheDocument();
@@ -59,7 +59,7 @@ describe("ProductionOrderForm", () => {
     await user.click(screen.getByRole("button", { name: "บันทึกใบผลิต" }));
     await waitFor(() => expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({
       status: "OPEN",
-      lines: [expect.objectContaining({ variantId: "paris-black-38", quantity: 4 })],
+      lines: [expect.objectContaining({ variantId: "paris-black-m", quantity: 4 })],
     })));
   });
 
@@ -67,7 +67,7 @@ describe("ProductionOrderForm", () => {
     const user = userEvent.setup();
     const { onSaved } = renderForm();
     await screen.findByRole("heading", { name: "สร้างใบผลิตออเดอร์" });
-    await selectParisBlack38(user);
+    await selectParisBlackM(user);
     await user.type(screen.getByRole("spinbutton", { name: "จำนวน (คู่) รายการ 1" }), "4");
     const orderDate = screen.getByLabelText("วันที่สั่งผลิต") as HTMLInputElement;
     await user.clear(orderDate);

@@ -5,6 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
 import type { ProductVariant } from "@/features/inventory/domain/types";
+import {
+  compareSizeLabels,
+  formatSizeOption,
+  SIZE_LABEL_MAX_LENGTH,
+} from "@/features/inventory/domain/size-label";
 import { useDocumentValidation } from "./document-validation-context";
 
 export interface DocumentVariantOption extends ProductVariant {
@@ -102,7 +107,14 @@ export function DocumentLineEditor({
           const colors = catalogColors ?? uniqueById(variants
             .filter((variant) => variant.modelId === line.modelId)
             .map((variant) => ({ id: variant.colorId, name: variant.colorName })));
-          const sizes = variants.filter((variant) => variant.modelId === line.modelId && variant.colorId === line.colorId);
+          const modelName = models.find((model) => model.id === line.modelId)?.name ?? "";
+          const sizes = variants
+            .filter((variant) =>
+              variant.modelId === line.modelId
+              && variant.colorId === line.colorId)
+            .sort((left, right) =>
+              compareSizeLabels(modelName, left.size, right.size)
+              || left.id.localeCompare(right.id));
           const selected = variants.find((variant) => variant.id === line.variantId);
           return (
             <fieldset className="document-line" key={line.id}>
@@ -144,7 +156,7 @@ export function DocumentLineEditor({
               <Select
                 id={`${controlId}-size`}
                 label={`ไซซ์ รายการ ${rowNumber}`}
-                value={line.creatingVariant ? "__new__" : selected?.size.toString() ?? ""}
+                value={line.creatingVariant ? "__new__" : selected?.size ?? ""}
                 disabled={!line.colorId}
                 error={line.creatingVariant ? null : selectedSizeError}
                 announceError={false}
@@ -153,18 +165,18 @@ export function DocumentLineEditor({
                     updateLine(line.id, { variantId: "", creatingVariant: true, newSize: "" }, ["variantId", "size", "section"]);
                     return;
                   }
-                  const variant = sizes.find((candidate) => candidate.size.toString() === event.target.value);
+                  const variant = sizes.find((candidate) => candidate.size === event.target.value);
                   updateLine(line.id, { variantId: variant?.id ?? "", creatingVariant: false, newSize: "" }, ["variantId", "size", "section"]);
                 }}
               >
                 <option value="">เลือกไซซ์</option>
                 {sizes.map((variant) => (
                   <option
-                    value={variant.size.toString()}
+                    value={variant.size}
                     key={variant.id}
                     disabled={variant.id !== line.variantId && selectedVariantIds.has(variant.id)}
                   >
-                    {variant.size}
+                    {formatSizeOption(modelName, variant.size)}
                   </option>
                 ))}
                 {allowVariantCreation && line.modelId && line.colorId && <option value="__new__">เพิ่มไซซ์ใหม่</option>}
@@ -173,9 +185,9 @@ export function DocumentLineEditor({
                 <Field
                   id={`${controlId}-new-size`}
                   label={`ไซซ์ใหม่ รายการ ${rowNumber}`}
-                  type="number"
-                  step="0.1"
-                  inputMode="decimal"
+                  type="text"
+                  autoCapitalize="characters"
+                  maxLength={SIZE_LABEL_MAX_LENGTH}
                   value={line.newSize}
                   error={sizeError ?? variantError}
                   announceError={false}

@@ -50,7 +50,7 @@ describe("ExchangePage", () => {
     const user = userEvent.setup();
     const repository = renderExchange();
     await screen.findByRole("heading", { name: "เปลี่ยนสินค้า" });
-    await fillSection(user, "สินค้าที่รับคืน", "38", "1");
+    await fillSection(user, "สินค้าที่รับคืน", "XS", "1");
     await user.click(screen.getByRole("button", { name: "ตรวจสอบการเปลี่ยน" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("รายการแลกเปลี่ยนต้องมีทั้งรายการคืนและรายการทดแทน");
@@ -65,8 +65,8 @@ describe("ExchangePage", () => {
     const user = userEvent.setup();
     const repository = renderExchange();
     await screen.findByRole("heading", { name: "เปลี่ยนสินค้า" });
-    await fillSection(user, "สินค้าที่รับคืน", "38", "1");
-    await fillSection(user, "สินค้าที่ส่งทดแทน", "38.5", "2");
+    await fillSection(user, "สินค้าที่รับคืน", "XS", "1");
+    await fillSection(user, "สินค้าที่ส่งทดแทน", "S", "2");
     await user.click(screen.getByRole("button", { name: "ตรวจสอบการเปลี่ยน" }));
 
     const dialog = await screen.findByRole("dialog", { name: "ยืนยันการเปลี่ยนสินค้า" });
@@ -90,8 +90,8 @@ describe("ExchangePage", () => {
     const user = userEvent.setup();
     const repository = renderExchange();
     await screen.findByRole("heading", { name: "เปลี่ยนสินค้า" });
-    await fillSection(user, "สินค้าที่รับคืน", "38.5", "1");
-    await fillSection(user, "สินค้าที่ส่งทดแทน", "38", "3");
+    await fillSection(user, "สินค้าที่รับคืน", "S", "1");
+    await fillSection(user, "สินค้าที่ส่งทดแทน", "XS", "3");
     expect(within(screen.getByRole("region", { name: "สินค้าที่ส่งทดแทน" })).getByText("คงเหลือ 2 คู่")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "ตรวจสอบการเปลี่ยน" }));
 
@@ -108,12 +108,12 @@ describe("ExchangePage", () => {
     const user = userEvent.setup();
     const storage = new MemoryStorage();
     const snapshot = createSeedSnapshot();
-    snapshot.balances["paris-black-38"] = 0;
+    snapshot.balances["paris-black-xs"] = 0;
     storage.setItem(INVENTORY_STORAGE_KEY, JSON.stringify(snapshot));
     const repository = renderExchange(new ExchangeRepository(storage));
     await screen.findByRole("heading", { name: "เปลี่ยนสินค้า" });
-    await fillSection(user, "สินค้าที่รับคืน", "38", "1");
-    await fillSection(user, "สินค้าที่ส่งทดแทน", "38", "1");
+    await fillSection(user, "สินค้าที่รับคืน", "XS", "1");
+    await fillSection(user, "สินค้าที่ส่งทดแทน", "XS", "1");
 
     await user.click(screen.getByRole("button", { name: "ตรวจสอบการเปลี่ยน" }));
     expect(await screen.findByRole("dialog", { name: "ยืนยันการเปลี่ยนสินค้า" })).toBeInTheDocument();
@@ -125,8 +125,8 @@ describe("ExchangePage", () => {
     const repository = renderExchange();
     repository.failNext = true;
     await screen.findByRole("heading", { name: "เปลี่ยนสินค้า" });
-    await fillSection(user, "สินค้าที่รับคืน", "38", "1");
-    await fillSection(user, "สินค้าที่ส่งทดแทน", "38.5", "2");
+    await fillSection(user, "สินค้าที่รับคืน", "XS", "1");
+    await fillSection(user, "สินค้าที่ส่งทดแทน", "S", "2");
     await user.type(screen.getByRole("textbox", { name: "เลขอ้างอิง" }), "EX-401");
     await user.click(screen.getByRole("button", { name: "ตรวจสอบการเปลี่ยน" }));
     let dialog = await screen.findByRole("dialog", { name: "ยืนยันการเปลี่ยนสินค้า" });

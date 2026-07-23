@@ -58,7 +58,7 @@ describe("InventoryPage", () => {
 
     const mobileCards = screen.getByRole("list", { name: "รายการสินค้าสำหรับมือถือ" });
     expect(within(mobileCards).getAllByText("Paris / Black")).toHaveLength(7);
-    expect(within(mobileCards).getAllByText("ไซซ์ 38").length).toBeGreaterThan(0);
+    expect(within(mobileCards).getAllByText("ไซซ์ XS").length).toBeGreaterThan(0);
   });
 
   it("summarizes matching variants and pairs as filters change", async () => {
@@ -97,15 +97,15 @@ describe("InventoryPage", () => {
     expect(await screen.findByRole("button", { name: "ล้างสต๊อก" })).toBeDisabled();
   });
 
-  it("searches decimal sizes and filters the same rows to low stock", async () => {
+  it("searches text sizes and filters the same rows to low stock", async () => {
     const user = userEvent.setup();
     renderInventory();
     const table = await screen.findByRole("table", { name: "สินค้าคงคลัง" });
 
-    await user.type(screen.getByRole("searchbox", { name: "ค้นหาสินค้า" }), "38.5");
-    expect(within(table).getAllByRole("row")).toHaveLength(10);
+    await user.type(screen.getByRole("searchbox", { name: "ค้นหาสินค้า" }), "XS");
+    expect(within(table).getAllByRole("row")).toHaveLength(7);
     for (const row of within(table).getAllByRole("row").slice(1)) {
-      expect(within(row).getByText("38.5")).toBeInTheDocument();
+      expect(within(row).getByText("XS")).toBeInTheDocument();
     }
 
     await user.clear(screen.getByRole("searchbox", { name: "ค้นหาสินค้า" }));
@@ -130,7 +130,7 @@ describe("InventoryPage", () => {
     renderInventory();
     await screen.findByRole("table", { name: "สินค้าคงคลัง" });
 
-    await user.click(screen.getAllByRole("button", { name: "แก้ไขเกณฑ์ Paris Black ไซซ์ 38" })[0]);
+    await user.click(screen.getAllByRole("button", { name: "แก้ไขเกณฑ์ Paris Black ไซซ์ XS" })[0]);
     const dialog = screen.getByRole("dialog", { name: "แก้ไขเกณฑ์สต๊อกต่ำ" });
     const input = within(dialog).getByRole("spinbutton", { name: "เกณฑ์สต๊อกต่ำ" });
 

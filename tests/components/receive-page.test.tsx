@@ -51,7 +51,7 @@ function renderReceipt(repository = new ReceiptRepository(new MemoryStorage())) 
   return repository;
 }
 
-async function selectVariant(user: ReturnType<typeof userEvent.setup>, row: number, size = "38.5") {
+async function selectVariant(user: ReturnType<typeof userEvent.setup>, row: number, size = "M") {
   await user.selectOptions(screen.getByRole("combobox", { name: `รุ่นสินค้า รายการ ${row}` }), "paris");
   await user.selectOptions(screen.getByRole("combobox", { name: `สีสินค้า รายการ ${row}` }), "black");
   await user.selectOptions(screen.getByRole("combobox", { name: `ไซซ์ รายการ ${row}` }), size);
@@ -74,19 +74,21 @@ describe("ReceivePage", () => {
     expect(model).toHaveAttribute("aria-invalid", "true");
     expect(model).toHaveAccessibleDescription("กรุณากรอกข้อมูลให้ครบถ้วน");
     expect(size).toHaveAttribute("aria-invalid", "true");
-    expect(size).toHaveAccessibleDescription("ขนาดรองเท้าต้องมากกว่า 0");
+    expect(size).toHaveAccessibleDescription("กรุณาระบุไซซ์รองเท้า");
     expect(quantity).toHaveAttribute("aria-invalid", "true");
     expect(quantity).toHaveAccessibleDescription("จำนวนต้องเป็นจำนวนเต็มบวก");
     expect(repository.inputs).toHaveLength(0);
   });
 
-  it("adds and removes rows and offers decimal shoe sizes", async () => {
+  it("adds and removes rows and shows model-specific fitting guidance", async () => {
     const user = userEvent.setup();
     renderReceipt();
     await screen.findByRole("heading", { name: "รับสินค้า" });
 
     await selectVariant(user, 1);
-    expect(screen.getByRole("combobox", { name: "ไซซ์ รายการ 1" })).toHaveDisplayValue("38.5");
+    expect(screen.getByRole("combobox", { name: "ไซซ์ รายการ 1" })).toHaveDisplayValue(
+      "M — EU 39–40 · 24–24.5 cm",
+    );
 
     await user.click(screen.getByRole("button", { name: "เพิ่มรายการ" }));
     expect(screen.getByRole("combobox", { name: "รุ่นสินค้า รายการ 2" })).toBeInTheDocument();
@@ -98,7 +100,7 @@ describe("ReceivePage", () => {
     const user = userEvent.setup();
     const repository = renderReceipt();
     await screen.findByRole("heading", { name: "รับสินค้า" });
-    await selectVariant(user, 1, "38");
+    await selectVariant(user, 1, "XS");
     fireEvent.change(screen.getByRole("spinbutton", { name: "จำนวน (คู่) รายการ 1" }), { target: { value: "1.5" } });
     await user.click(screen.getByRole("button", { name: "บันทึกรับสินค้า" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("จำนวนต้องเป็นจำนวนเต็มบวก");
@@ -108,7 +110,7 @@ describe("ReceivePage", () => {
     await user.click(screen.getByRole("button", { name: "เพิ่มรายการ" }));
     await user.selectOptions(screen.getByRole("combobox", { name: "รุ่นสินค้า รายการ 2" }), "paris");
     await user.selectOptions(screen.getByRole("combobox", { name: "สีสินค้า รายการ 2" }), "black");
-    fireEvent.change(screen.getByRole("combobox", { name: "ไซซ์ รายการ 2" }), { target: { value: "38" } });
+    fireEvent.change(screen.getByRole("combobox", { name: "ไซซ์ รายการ 2" }), { target: { value: "XS" } });
     await user.type(screen.getByRole("spinbutton", { name: "จำนวน (คู่) รายการ 2" }), "1");
     await user.click(screen.getByRole("button", { name: "บันทึกรับสินค้า" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("ไม่สามารถเลือกรุ่นรองเท้าซ้ำในรายการเดียวกันได้");
@@ -120,13 +122,15 @@ describe("ReceivePage", () => {
     const repository = renderReceipt();
     repository.failNext = true;
     await screen.findByRole("heading", { name: "รับสินค้า" });
-    await selectVariant(user, 1, "38.5");
+    await selectVariant(user, 1, "M");
     await user.type(screen.getByRole("spinbutton", { name: "จำนวน (คู่) รายการ 1" }), "3");
     await user.type(screen.getByRole("textbox", { name: "เลขอ้างอิง" }), "PO-104");
 
     await user.click(screen.getByRole("button", { name: "บันทึกรับสินค้า" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("ไม่สามารถบันทึกข้อมูลได้");
-    expect(screen.getByRole("combobox", { name: "ไซซ์ รายการ 1" })).toHaveDisplayValue("38.5");
+    expect(screen.getByRole("combobox", { name: "ไซซ์ รายการ 1" })).toHaveDisplayValue(
+      "M — EU 39–40 · 24–24.5 cm",
+    );
     expect(screen.getByRole("spinbutton", { name: "จำนวน (คู่) รายการ 1" })).toHaveValue(3);
     expect(screen.getByRole("textbox", { name: "เลขอ้างอิง" })).toHaveValue("PO-104");
 
@@ -148,15 +152,17 @@ describe("ReceivePage", () => {
     await user.selectOptions(screen.getByRole("combobox", { name: "รุ่นสินค้า รายการ 1" }), model.id);
     await user.selectOptions(screen.getByRole("combobox", { name: "สีสินค้า รายการ 1" }), color.id);
     await user.selectOptions(screen.getByRole("combobox", { name: "ไซซ์ รายการ 1" }), "__new__");
-    await user.type(screen.getByRole("spinbutton", { name: "ไซซ์ใหม่ รายการ 1" }), "44.5");
+    const customSize = screen.getByRole("textbox", { name: "ไซซ์ใหม่ รายการ 1" });
+    expect(customSize).toHaveAttribute("maxlength", "24");
+    await user.type(customSize, " free ");
     await user.type(screen.getByRole("spinbutton", { name: "จำนวน (คู่) รายการ 1" }), "2");
     await user.click(screen.getByRole("button", { name: "บันทึกรับสินค้า" }));
 
     expect(await screen.findByRole("status", { name: "บันทึกสำเร็จ" })).toHaveTextContent("รับสินค้าเรียบร้อย");
-    expect(repository.ensured).toEqual([{ modelId: model.id, colorId: color.id, size: "44.5" }]);
+    expect(repository.ensured).toEqual([{ modelId: model.id, colorId: color.id, size: "FREE" }]);
     const snapshot = await repository.load();
     const created = snapshot.variants.find((variant) =>
-      variant.modelId === model.id && variant.colorId === color.id && variant.size === "44.5",
+      variant.modelId === model.id && variant.colorId === color.id && variant.size === "FREE",
     );
     expect(created).toBeDefined();
     expect(snapshot.balances[created!.id]).toBe(2);
@@ -166,7 +172,7 @@ describe("ReceivePage", () => {
     const user = userEvent.setup();
     renderReceipt(new ConfirmedReceiptRefreshFailsRepository(new MemoryStorage()));
     await screen.findByRole("heading", { name: "รับสินค้า" });
-    await selectVariant(user, 1, "38");
+    await selectVariant(user, 1, "XS");
     await user.type(screen.getByRole("spinbutton", { name: "จำนวน (คู่) รายการ 1" }), "1");
 
     await user.click(screen.getByRole("button", { name: "บันทึกรับสินค้า" }));
