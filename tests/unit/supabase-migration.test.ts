@@ -7,6 +7,11 @@ const migration = readFileSync(
   "utf8",
 ).replaceAll("\r\n", "\n").toLocaleLowerCase("en-US");
 
+const sizeMigrationPath = resolve(
+  process.cwd(),
+  "supabase/migrations/202607230005_text_size_profiles.sql",
+);
+
 describe("Supabase inventory migration ACL", () => {
   it("revokes broad catalog writes before granting only the required columns", () => {
     const broadRevoke = [
@@ -105,5 +110,52 @@ describe("Supabase inventory migration ACL", () => {
     expect(productionMigration).toContain("posted_document := public.post_stock_document(receipt_command);");
     expect(productionMigration).toMatch(/update public\.production_orders[\s\S]*?received_document_id[\s\S]*?status = 'received'/);
     expect(productionMigration).toContain("grant execute on function public.receive_production_order(jsonb) to anon, authenticated;");
+  });
+});
+
+describe("Supabase text-size migration", () => {
+  it("converts both deployed size columns and replaces affected RPC contracts", () => {
+    const sizeMigration = readFileSync(sizeMigrationPath, "utf8")
+      .replaceAll("\r\n", "\n")
+      .toLocaleLowerCase("en-US");
+
+    expect(sizeMigration).toContain(
+      "alter table public.product_variants alter column size type text",
+    );
+    expect(sizeMigration).toContain(
+      "alter table public.production_order_lines alter column size type text",
+    );
+    expect(sizeMigration).toContain(
+      "create unique index product_variants_model_color_size_label_key",
+    );
+    expect(sizeMigration).toContain(
+      "create or replace function public.ensure_product_variant(",
+    );
+    expect(sizeMigration).toContain("p_size text");
+    expect(sizeMigration).toContain(
+      "drop function if exists public.ensure_product_variant(uuid, uuid, numeric)",
+    );
+    expect(sizeMigration).toContain(
+      "create or replace function public.post_stock_document(command jsonb)",
+    );
+    expect(sizeMigration).toContain(
+      "create or replace function public.save_production_order(command jsonb)",
+    );
+    expect(sizeMigration).toContain(
+      "create or replace function public.receive_production_order(command jsonb)",
+    );
+  });
+
+  it("seeds approved profiles without deleting live stock or history", () => {
+    const sizeMigration = readFileSync(sizeMigrationPath, "utf8")
+      .replaceAll("\r\n", "\n")
+      .toLocaleLowerCase("en-US");
+
+    expect(sizeMigration).toContain("('paris', 'xs')");
+    expect(sizeMigration).toContain("('castor', '3xl')");
+    expect(sizeMigration).toContain("('weave', '45')");
+    expect(sizeMigration).not.toMatch(
+      /delete\s+from\s+public\.(?:product_variants|inventory_balances|stock_documents|production_orders)/,
+    );
   });
 });
