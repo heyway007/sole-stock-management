@@ -35,7 +35,8 @@ describe("ProductionOrderPrint", () => {
     expect(screen.getByText("PO-20260722-000001")).toBeInTheDocument();
     const table = screen.getByRole("table", { name: "รายการสั่งผลิต" });
     expect(within(table).getAllByText("Paris")).toHaveLength(2);
-    expect(within(table).getByText("38.5")).toBeInTheDocument();
+    expect(within(table).getByText("M")).toBeInTheDocument();
+    expect(table).not.toHaveTextContent("24–24.5 cm");
     expect(screen.getByText("รวมทั้งหมด 10 คู่")).toBeInTheDocument();
     expect(screen.getByText("ส่งก่อนเที่ยง")).toBeInTheDocument();
     expect(screen.getByText("ผู้สั่งผลิต")).toBeInTheDocument();

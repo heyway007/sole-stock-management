@@ -59,7 +59,8 @@ describe("ProductionOrderDetailPage", () => {
 
     expect(await screen.findByRole("heading", { name: "PO-20260722-000001" })).toBeInTheDocument();
     const table = screen.getByRole("table", { name: "รายการในใบผลิต" });
-    expect(within(table).getByText("38.5")).toBeInTheDocument();
+    expect(within(table).getByText("M")).toBeInTheDocument();
+    expect(table).not.toHaveTextContent("24–24.5 cm");
     expect(screen.getByText("รวม 2 รายการ · 10 คู่")).toBeInTheDocument();
     expect(screen.getByText("ส่งก่อนเที่ยง")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "พิมพ์ใบผลิต" })).toBeInTheDocument();
