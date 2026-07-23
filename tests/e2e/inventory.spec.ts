@@ -151,10 +151,13 @@ test("demo inventory workflow stays accurate on desktop and routes stay usable o
     await chooseVariant(productionEditor, 1, {
       model: "E2E Runner", color: "E2E White", size: "FREE", quantity: "6",
     });
+    await productionEditor.getByLabel("ราคาต่อหน่วย รายการ 1").fill("327");
     await productionEditor.getByRole("button", { name: "เพิ่มรายการ" }).click();
     await chooseVariant(productionEditor, 2, {
       model: "Paris", color: "Black", size: "M", quantity: "5",
     });
+    await productionEditor.getByLabel("ราคาต่อหน่วย รายการ 2").fill("265");
+    await expect(page.getByText("รวม 2 รายการ · 11 คู่ · 3,287.00 บาท")).toBeVisible();
     await page.getByRole("button", { name: "บันทึกใบผลิต" }).click();
 
     const firstOrderHeading = page.getByRole("heading", { level: 1 });
@@ -163,6 +166,7 @@ test("demo inventory workflow stays accurate on desktop and routes stay usable o
     await expect(page.getByText("รอรับเข้า", { exact: true })).toBeVisible();
     await expect(page.getByRole("region", { name: "ข้อมูลใบผลิต" })).toContainText("2 รายการ");
     await expect(page.getByRole("region", { name: "ข้อมูลใบผลิต" })).toContainText("11 คู่");
+    await expect(page.getByText(/ยอดรวมสุทธิ 3,287.00 บาท/)).toBeVisible();
 
     await page.getByRole("link", { name: "แก้ไข" }).click();
     const editedExpectedDate = localDateAfter(21);
@@ -172,13 +176,16 @@ test("demo inventory workflow stays accurate on desktop and routes stay usable o
     await expect(page.getByRole("region", { name: "ข้อมูลใบผลิต" })).toContainText(editedExpectedDate);
 
     await page.getByRole("link", { name: "พิมพ์ใบผลิต" }).click();
-    await expect(page.getByRole("heading", { level: 1, name: "ใบผลิตออเดอร์" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "ใบสั่งผลิต" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "ข้อมูลบริษัท" })).toContainText("STRUGGER STUDIO NO.45 CO., LTD.");
+    await expect(page.getByRole("region", { name: "ข้อมูลเอกสาร" })).toContainText(firstOrderNumber);
     await expect(page.locator(".production-print-page")).toContainText(firstOrderNumber);
     await expect(page.locator(".production-print-page")).toContainText("E2E Runner");
     await expect(page.locator(".production-print-page")).toContainText("FREE");
     await expect(page.locator(".production-print-page")).toContainText("M");
     await expect(page.locator(".production-print-page")).not.toContainText("24–24.5 cm");
     await expect(page.locator(".production-print-page")).toContainText("11 คู่");
+    await expect(page.locator(".production-print-page")).toContainText("3,287.00 บาท");
     await page.emulateMedia({ media: "print" });
     await expect(page.locator(".sidebar")).toBeHidden();
     await expect(page.locator(".mobile-nav")).toBeHidden();
@@ -210,6 +217,7 @@ test("demo inventory workflow stays accurate on desktop and routes stay usable o
     await chooseVariant(page.getByRole("region", { name: "รายการสั่งผลิต" }), 1, {
       model: "Paris", color: "Black", size: "M", quantity: "4",
     });
+    await page.getByLabel("ราคาต่อหน่วย รายการ 1").fill("327");
     await page.getByRole("button", { name: "บันทึกใบผลิต" }).click();
     const cancelledOrderHeading = page.getByRole("heading", { level: 1 });
     await expect(cancelledOrderHeading).toHaveText(/^PO-/);
@@ -378,6 +386,7 @@ test("demo inventory workflow stays accurate on desktop and routes stay usable o
       await chooseVariant(page.getByRole("region", { name: "รายการสั่งผลิต" }), 1, {
         model: "Paris", color: "Black", size: "M", quantity: "1",
       });
+      await page.getByLabel("ราคาต่อหน่วย รายการ 1").fill("327");
       await page.getByRole("button", { name: "บันทึกใบผลิต" }).click();
       await expect(page.getByRole("heading", { level: 1 })).toHaveText(/^PO-/);
       await expect(page.getByRole("list", { name: "รายการในใบผลิตสำหรับมือถือ" })).toBeVisible();
