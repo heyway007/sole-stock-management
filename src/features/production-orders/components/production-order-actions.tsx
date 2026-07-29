@@ -10,6 +10,10 @@ import type {
   ProductionOrder,
   ProductionOrderReceiptResult,
 } from "../domain/types";
+import {
+  productionOrderEditHref,
+  productionOrderPrintHref,
+} from "../routes";
 
 interface ProductionOrderActionsProps {
   order: ProductionOrder;
@@ -101,11 +105,11 @@ export function ProductionOrderActions({ order, onCancel, onReceive }: Productio
 
   return (
     <div className="production-order-actions" aria-label="จัดการใบผลิต">
-      <Link className="button button--secondary" href={`/production-orders/${order.id}/print`}>
+      <Link className="button button--secondary" href={productionOrderPrintHref(order.id)}>
         <Printer aria-hidden size={17} />พิมพ์ใบผลิต
       </Link>
       {order.status === "OPEN" && <>
-        <Link className="button button--secondary" href={`/production-orders/${order.id}/edit`}>
+        <Link className="button button--secondary" href={productionOrderEditHref(order.id)}>
           <Edit3 aria-hidden size={17} />แก้ไข
         </Link>
         <Button variant="secondary" className="production-cancel-action" disabled={pending !== null} onClick={() => void confirmCancellation()}>

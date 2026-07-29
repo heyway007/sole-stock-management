@@ -175,7 +175,7 @@ describe("ProductionOrderForm", () => {
     });
 
     expect(await screen.findByRole("heading", { name: "ไม่สามารถแก้ไขใบผลิตนี้ได้" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "กลับไปดูรายละเอียด" })).toHaveAttribute("href", "/production-orders/order-cancelled");
+    expect(screen.getByRole("link", { name: "กลับไปดูรายละเอียด" })).toHaveAttribute("href", "/production-orders/detail?id=order-cancelled");
     expect(screen.queryByRole("button", { name: "บันทึกใบผลิต" })).not.toBeInTheDocument();
   });
 

@@ -28,6 +28,7 @@ import {
   validateProductionOrder,
 } from "../domain/validation";
 import { useProductionOrders } from "../production-order-provider";
+import { productionOrderDetailHref } from "../routes";
 import {
   formatBahtMinor,
   lineTotalMinor,
@@ -194,7 +195,7 @@ function ProductionOrderFormReady({
           <h1>{order ? "แก้ไขใบผลิตออเดอร์" : "สร้างใบผลิตออเดอร์"}</h1>
           <p>{order ? "แก้ไขข้อมูลได้จนกว่าจะรับเข้าสต๊อกหรือยกเลิก" : "ระบบจะสร้างเลขที่ใบผลิตให้อัตโนมัติหลังบันทึก"}</p>
         </div>
-        <Link className="button button--secondary" href={order ? `/production-orders/${order.id}` : "/production-orders"}>ยกเลิก</Link>
+        <Link className="button button--secondary" href={order ? productionOrderDetailHref(order.id) : "/production-orders"}>ยกเลิก</Link>
       </header>
       <RepositoryStatusBanner />
       {warning && <div className="repository-status-banner" role="alert">{warning}</div>}
@@ -274,7 +275,7 @@ export function ProductionOrderForm({ order, onSaved }: ProductionOrderFormProps
         <div>
           <h1>ไม่สามารถแก้ไขใบผลิตนี้ได้</h1>
           <p>แก้ไขได้เฉพาะใบผลิตที่อยู่ในสถานะรอรับเข้า</p>
-          <Link className="button button--primary" href={`/production-orders/${order.id}`}>กลับไปดูรายละเอียด</Link>
+          <Link className="button button--primary" href={productionOrderDetailHref(order.id)}>กลับไปดูรายละเอียด</Link>
         </div>
       </div>
     );

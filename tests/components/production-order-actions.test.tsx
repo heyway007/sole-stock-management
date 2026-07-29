@@ -67,8 +67,8 @@ describe("ProductionOrderActions", () => {
   it("shows lifecycle actions only while an order is open", () => {
     const props = { onCancel: vi.fn(), onReceive: vi.fn() };
     const view = render(<ProductionOrderActions order={openOrder} {...props} />);
-    expect(screen.getByRole("link", { name: "พิมพ์ใบผลิต" })).toHaveAttribute("href", "/production-orders/order-1/print");
-    expect(screen.getByRole("link", { name: "แก้ไข" })).toHaveAttribute("href", "/production-orders/order-1/edit");
+    expect(screen.getByRole("link", { name: "พิมพ์ใบผลิต" })).toHaveAttribute("href", "/production-orders/print?id=order-1");
+    expect(screen.getByRole("link", { name: "แก้ไข" })).toHaveAttribute("href", "/production-orders/edit?id=order-1");
     expect(screen.getByRole("button", { name: "ยกเลิกใบผลิต" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "รับเข้าสต๊อก" })).toBeInTheDocument();
 
