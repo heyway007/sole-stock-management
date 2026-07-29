@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   amountToMinor,
+  parseDiscountInput,
   formatBahtMinor,
   lineTotalMinor,
   parseUnitPriceInput,
@@ -16,6 +17,20 @@ describe("production-order money", () => {
     "rejects invalid price input %s",
     (value) => {
       expect(parseUnitPriceInput(value)).toBeNull();
+    },
+  );
+
+  it("parses an empty discount as zero and accepts whole or two-decimal baht", () => {
+    expect(parseDiscountInput("")).toBe(0);
+    expect(parseDiscountInput("0")).toBe(0);
+    expect(parseDiscountInput("250")).toBe(250);
+    expect(parseDiscountInput("250.50")).toBe(250.5);
+  });
+
+  it.each(["-1", "1.234", "1e3"])(
+    "rejects invalid discount input %s",
+    (value) => {
+      expect(parseDiscountInput(value)).toBeNull();
     },
   );
 

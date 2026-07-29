@@ -13,6 +13,7 @@ export interface ProductionOrderInput {
   orderDate: string;
   expectedDate: string;
   note: string;
+  discount: number;
   lines: ProductionOrderLineInput[];
 }
 
@@ -33,6 +34,7 @@ export interface ProductionOrder {
   orderDate: string;
   expectedDate: string;
   note: string;
+  discount: number;
   status: ProductionOrderStatus;
   receivedDocumentId: string | null;
   createdAt: string;
@@ -49,6 +51,6 @@ export interface ProductionOrderReceiptResult {
 
 export interface ProductionOrderValidationError {
   path: string;
-  code: "REQUIRED" | "INVALID_DATE_RANGE" | "INVALID_QUANTITY" | "INVALID_UNIT_PRICE" | "DUPLICATE_VARIANT";
+  code: "REQUIRED" | "INVALID_DATE_RANGE" | "INVALID_QUANTITY" | "INVALID_UNIT_PRICE" | "INVALID_DISCOUNT" | "DUPLICATE_VARIANT";
   message: string;
 }
