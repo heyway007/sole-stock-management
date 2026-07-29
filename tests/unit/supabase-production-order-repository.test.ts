@@ -281,7 +281,7 @@ describe("SupabaseProductionOrderRepository", () => {
       { discount: 0 },
     ]);
 
-    for (const discount of [-1, 1.234]) {
+    for (const discount of [null, -1, 1.234]) {
       const client = new ContractClient();
       client.rpcResults.push({
         data: [{ ...openOrder, discount }],

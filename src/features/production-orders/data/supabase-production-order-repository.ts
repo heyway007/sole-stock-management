@@ -83,7 +83,9 @@ function mappedLine(value: unknown): ProductionOrderLine {
 }
 
 function mappedOrder(value: unknown): ProductionOrder {
-  const discount = isRecord(value) ? value.discount ?? 0 : undefined;
+  const discount = isRecord(value)
+    ? ("discount" in value ? value.discount : 0)
+    : undefined;
   if (!isRecord(value)
     || !isNonEmptyString(value.id)
     || !isNonEmptyString(value.number)

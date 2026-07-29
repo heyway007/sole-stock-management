@@ -25,7 +25,7 @@ const order: ProductionOrder = {
   orderDate: "2026-07-22",
   expectedDate: "2026-08-05",
   note: "ส่งก่อนเที่ยง",
-  discount: 0,
+  discount: 250.5,
   status: "OPEN",
   receivedDocumentId: null,
   createdAt: "2026-07-22T10:00:00.000Z",
@@ -66,6 +66,7 @@ describe("ProductionOrderDetailPage", () => {
     expect(within(table).getByText("327.00 บาท")).toBeInTheDocument();
     expect(within(table).getByText("1,308.00 บาท")).toBeInTheDocument();
     expect(screen.getByText(/ยอดรวมสุทธิ 2,898.00 บาท/)).toBeInTheDocument();
+    expect(screen.queryByText(/ส่วนลด/)).not.toBeInTheDocument();
     expect(screen.getByText("ส่งก่อนเที่ยง")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "พิมพ์ใบผลิต" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "รับเข้าสต๊อก" })).toBeInTheDocument();

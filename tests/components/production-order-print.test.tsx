@@ -9,7 +9,7 @@ const openOrder: ProductionOrder = {
   orderDate: "2026-07-22",
   expectedDate: "2026-08-05",
   note: "ส่งก่อนเที่ยง",
-  discount: 0,
+  discount: 250.5,
   status: "OPEN",
   receivedDocumentId: null,
   createdAt: "2026-07-22T10:00:00.000Z",
@@ -52,6 +52,7 @@ describe("ProductionOrderPrint", () => {
     expect(table).not.toHaveTextContent("24–24.5 cm");
     expect(screen.getByText("รวมจำนวน 10 คู่")).toBeInTheDocument();
     expect(screen.getByText("ยอดรวมสุทธิ 2,898.00 บาท")).toBeInTheDocument();
+    expect(screen.queryByText(/ส่วนลด/)).not.toBeInTheDocument();
     expect(screen.getByText("ส่งก่อนเที่ยง")).toBeInTheDocument();
     expect(screen.getByText("ผู้สั่งผลิต")).toBeInTheDocument();
     expect(screen.getByText("ผู้รับออเดอร์")).toBeInTheDocument();

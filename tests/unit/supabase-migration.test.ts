@@ -23,6 +23,10 @@ const discountMigrationPath = resolve(
   process.cwd(),
   "supabase/migrations/202607290008_production_order_discount.sql",
 );
+const discountCompatibilityMigrationPath = resolve(
+  process.cwd(),
+  "supabase/migrations/202607290009_production_order_discount_compatibility.sql",
+);
 
 describe("Supabase inventory migration ACL", () => {
   it("revokes broad catalog writes before granting only the required columns", () => {
@@ -243,6 +247,26 @@ describe("Supabase production-order discount migration", () => {
     );
     expect(discountMigration).not.toMatch(
       /delete\s+from\s+public\.production_orders/,
+    );
+  });
+
+  it("keeps the save RPC compatible with clients that omit discount", () => {
+    const compatibilityMigration = readFileSync(
+      discountCompatibilityMigrationPath,
+      "utf8",
+    ).replaceAll("\r\n", "\n").toLocaleLowerCase("en-US");
+
+    expect(compatibilityMigration).toMatch(
+      /command \? 'discount'\s+and pg_catalog\.jsonb_typeof\(command -> 'discount'\) is distinct from 'number'/,
+    );
+    expect(compatibilityMigration).toContain(
+      "discount_value := case when creating then 0 else locked_order.discount end",
+    );
+    expect(compatibilityMigration).toContain(
+      "create or replace function public.save_production_order(command jsonb)",
+    );
+    expect(compatibilityMigration).not.toContain(
+      "alter table public.production_orders",
     );
   });
 });

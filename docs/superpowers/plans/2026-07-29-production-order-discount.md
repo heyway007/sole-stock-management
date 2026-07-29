@@ -15,6 +15,8 @@
 - Empty input means `0`.
 - Valid discounts are finite values from `0` upward with at most two decimal places.
 - Legacy demo or Supabase orders without a discount load as `0`.
+- Save commands from older clients may omit discount: creates use `0` and
+  edits preserve the current stored value.
 - Work is developed and verified on `codex/production-order-discount`; push to `main` only after all local checks pass.
 
 ---

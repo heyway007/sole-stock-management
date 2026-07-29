@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   amountToMinor,
+  discountAmountToMinor,
   parseDiscountInput,
   formatBahtMinor,
   lineTotalMinor,
@@ -33,6 +34,11 @@ describe("production-order money", () => {
       expect(parseDiscountInput(value)).toBeNull();
     },
   );
+
+  it("rejects hidden over-precision near the maximum discount", () => {
+    expect(discountAmountToMinor(9_999_999_999.99)).toBe(999_999_999_999);
+    expect(discountAmountToMinor(9_999_999_999.99001)).toBeNull();
+  });
 
   it("calculates and formats amounts using integer satang", () => {
     expect(amountToMinor(327.5)).toBe(32750);

@@ -28,6 +28,11 @@ The Supabase client mapper also treats an omitted discount as `0` so the new
 frontend can still load orders while a deployment is transitioning between
 the old and new RPC versions.
 
+The save RPC remains compatible with clients opened before the deployment.
+When such a client omits `discount`, creates default to `0` and edits preserve
+the order's current discount. A present discount still receives full numeric
+and precision validation.
+
 ## Form Behavior
 
 The create and edit forms show a numeric field labeled `ส่วนลด (บาท)` in the

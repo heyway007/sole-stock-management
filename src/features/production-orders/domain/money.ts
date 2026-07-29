@@ -9,8 +9,9 @@ export function amountToMinor(value: number | null): number | null {
   if (value === null || !Number.isFinite(value) || value <= 0) return null;
   const scaled = value * 100;
   const rounded = Math.round(scaled);
-  const tolerance = Number.EPSILON * Math.max(1, Math.abs(scaled)) * 8;
-  if (Math.abs(scaled - rounded) > tolerance || rounded > MAX_AMOUNT_MINOR) {
+  if (!Number.isSafeInteger(rounded)
+    || rounded / 100 !== value
+    || rounded > MAX_AMOUNT_MINOR) {
     return null;
   }
   return rounded;
@@ -20,8 +21,9 @@ export function discountAmountToMinor(value: number): number | null {
   if (!Number.isFinite(value) || value < 0) return null;
   const scaled = value * 100;
   const rounded = Math.round(scaled);
-  const tolerance = Number.EPSILON * Math.max(1, Math.abs(scaled)) * 8;
-  if (Math.abs(scaled - rounded) > tolerance || rounded > MAX_AMOUNT_MINOR) {
+  if (!Number.isSafeInteger(rounded)
+    || rounded / 100 !== value
+    || rounded > MAX_AMOUNT_MINOR) {
     return null;
   }
   return rounded;
