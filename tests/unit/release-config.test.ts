@@ -4,6 +4,19 @@ import { describe, expect, it } from "vitest";
 import playwrightConfig from "../../playwright.config";
 
 describe("release verification configuration", () => {
+  it("uses the deployed Cloudflare Worker name for self-reference bindings", () => {
+    const packageJson = JSON.parse(
+      fs.readFileSync(path.resolve(process.cwd(), "package.json"), "utf8"),
+    ) as { name?: unknown };
+    const packageLock = JSON.parse(
+      fs.readFileSync(path.resolve(process.cwd(), "package-lock.json"), "utf8"),
+    ) as { name?: unknown; packages?: { ""?: { name?: unknown } } };
+
+    expect(packageJson.name).toBe("sole-stock-management");
+    expect(packageLock.name).toBe("sole-stock-management");
+    expect(packageLock.packages?.[""]?.name).toBe("sole-stock-management");
+  });
+
   it("uses an isolated demo server and the binding responsive viewports", () => {
     const webServer = Array.isArray(playwrightConfig.webServer)
       ? playwrightConfig.webServer[0]
