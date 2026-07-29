@@ -31,6 +31,7 @@ import { useProductionOrders } from "../production-order-provider";
 import {
   formatBahtMinor,
   lineTotalMinor,
+  parseDiscountInput,
   parseUnitPriceInput,
 } from "../domain/money";
 import { ProductionOrderLinePrice } from "./production-order-line-price";
@@ -78,10 +79,12 @@ function ProductionOrderFormReady({
   const initialOrderDate = order?.orderDate ?? today;
   const initialExpectedDate = order?.expectedDate ?? today;
   const initialNote = order?.note ?? "";
+  const initialDiscount = String(order?.discount ?? 0);
   const initialDrafts = useMemo(() => initialLines(order, snapshot), [order, snapshot]);
   const [orderDate, setOrderDate] = useState(initialOrderDate);
   const [expectedDate, setExpectedDate] = useState(initialExpectedDate);
   const [note, setNote] = useState(initialNote);
+  const [discount, setDiscount] = useState(initialDiscount);
   const [lines, setLines] = useState<DocumentLineDraft[]>(initialDrafts);
   const [validationErrors, setValidationErrors] = useState<ProductionOrderValidationError[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
@@ -105,23 +108,25 @@ function ProductionOrderFormReady({
     orderDate,
     expectedDate,
     note,
+    discount: parseDiscountInput(discount) ?? Number.NaN,
     lines: lines.map((line) => ({
       variantId: line.variantId,
       quantity: Number(line.quantity),
       unitPrice: parseUnitPriceInput(line.unitPrice ?? "") ?? Number.NaN,
     })),
-  }), [expectedDate, lines, note, order, orderDate]);
+  }), [discount, expectedDate, lines, note, order, orderDate]);
   const initialFingerprint = useMemo(() => JSON.stringify({
     ...(order ? { id: order.id } : {}),
     orderDate: initialOrderDate,
     expectedDate: initialExpectedDate,
     note: initialNote,
+    discount: parseDiscountInput(initialDiscount) ?? Number.NaN,
     lines: initialDrafts.map((line) => ({
       variantId: line.variantId,
       quantity: Number(line.quantity),
       unitPrice: parseUnitPriceInput(line.unitPrice ?? "") ?? Number.NaN,
     })),
-  }), [initialDrafts, initialExpectedDate, initialNote, initialOrderDate, order]);
+  }), [initialDiscount, initialDrafts, initialExpectedDate, initialNote, initialOrderDate, order]);
   const dirty = JSON.stringify(input) !== initialFingerprint;
   useUnsavedChanges(!saved && dirty);
 
@@ -214,6 +219,20 @@ function ProductionOrderFormReady({
               value={expectedDate}
               error={validationContext.errorFor("expectedDate")}
               onChange={(event) => { setExpectedDate(event.target.value); clearHeaderError("expectedDate"); }}
+            />
+            <Field
+              id="production-discount"
+              label="ส่วนลด (บาท)"
+              type="number"
+              min="0"
+              step="0.01"
+              inputMode="decimal"
+              value={discount}
+              error={validationContext.errorFor("discount")}
+              onChange={(event) => {
+                setDiscount(event.target.value);
+                clearHeaderError("discount");
+              }}
             />
             <label className="form-field document-note">
               <span className="form-field__label">หมายเหตุ</span>

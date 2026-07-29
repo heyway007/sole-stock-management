@@ -2,7 +2,10 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DemoInventoryRepository } from "@/features/inventory/data/demo-repository";
-import { DemoProductionOrderRepository } from "@/features/production-orders/data/demo-production-order-repository";
+import {
+  DemoProductionOrderRepository,
+  PRODUCTION_ORDER_STORAGE_KEY,
+} from "@/features/production-orders/data/demo-production-order-repository";
 import { ProductionOrderForm } from "@/features/production-orders/components/production-order-form";
 import type { ProductionOrder } from "@/features/production-orders/domain/types";
 import { InventoryProvider } from "@/features/inventory/inventory-provider";
@@ -20,6 +23,14 @@ class MemoryStorage implements Storage {
 
 function renderForm(order?: ProductionOrder) {
   const storage = new MemoryStorage();
+  if (order) {
+    storage.setItem(PRODUCTION_ORDER_STORAGE_KEY, JSON.stringify({
+      version: 1,
+      revision: 0,
+      orders: [order],
+      receipts: {},
+    }));
+  }
   const inventory = new DemoInventoryRepository(storage);
   const production = new DemoProductionOrderRepository(storage, inventory);
   const onSaved = vi.fn();
@@ -50,6 +61,10 @@ describe("ProductionOrderForm", () => {
     expect(screen.getByText("ระบบจะสร้างเลขที่ใบผลิตให้อัตโนมัติหลังบันทึก")).toBeInTheDocument();
     const orderDate = screen.getByLabelText("วันที่สั่งผลิต");
     expect(screen.getByLabelText("วันที่กำหนดรับ")).toHaveValue((orderDate as HTMLInputElement).value);
+    const discount = screen.getByRole("spinbutton", { name: "ส่วนลด (บาท)" });
+    expect(discount).toHaveValue(0);
+    await user.clear(discount);
+    await user.type(discount, "150.50");
 
     await selectParisBlackM(user);
     await user.type(screen.getByRole("spinbutton", { name: "จำนวน (คู่) รายการ 1" }), "4");
@@ -61,11 +76,55 @@ describe("ProductionOrderForm", () => {
     await user.click(screen.getByRole("button", { name: "บันทึกใบผลิต" }));
     await waitFor(() => expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({
       status: "OPEN",
+      discount: 150.5,
       lines: [expect.objectContaining({
         variantId: "paris-black-m",
         quantity: 4,
         unitPrice: 327,
       })],
+    })));
+  });
+
+  it("restores and saves the discount when editing an open order", async () => {
+    const user = userEvent.setup();
+    const order: ProductionOrder = {
+      id: "order-open",
+      number: "PO-20260722-000001",
+      orderDate: "2026-07-22",
+      expectedDate: "2026-08-05",
+      note: "",
+      discount: 200,
+      status: "OPEN",
+      receivedDocumentId: null,
+      createdAt: "2026-07-22T10:00:00.000Z",
+      updatedAt: "2026-07-22T10:00:00.000Z",
+      receivedAt: null,
+      cancelledAt: null,
+      lines: [{
+        id: "line-1",
+        variantId: "paris-black-m",
+        lineNumber: 1,
+        modelName: "Paris",
+        colorName: "Black",
+        size: "M",
+        quantity: 4,
+        unitPrice: 327,
+      }],
+    };
+    const { onSaved } = renderForm(order);
+
+    expect(await screen.findByRole("heading", { name: "แก้ไขใบผลิตออเดอร์" })).toBeInTheDocument();
+    const discount = screen.getByRole("spinbutton", { name: "ส่วนลด (บาท)" });
+    expect(discount).toHaveValue(200);
+    expect(screen.getByText("รวม 1 รายการ · 4 คู่ · 1,308.00 บาท")).toBeInTheDocument();
+
+    await user.clear(discount);
+    await user.type(discount, "250.25");
+    await user.click(screen.getByRole("button", { name: "บันทึกใบผลิต" }));
+
+    await waitFor(() => expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({
+      id: order.id,
+      discount: 250.25,
     })));
   });
 
