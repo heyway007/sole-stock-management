@@ -1,5 +1,7 @@
 export const SIZE_LABEL_MAX_LENGTH = 24;
 
+const RETIRED_SIZE_LABELS = new Set(["38.5", "43.5"]);
+
 export interface SizeProfileEntry {
   label: string;
   euRange?: string;
@@ -52,6 +54,11 @@ export function normalizeSizeLabel(value: unknown): string | null {
   }
 
   return normalized;
+}
+
+export function isRetiredSizeLabel(value: unknown): boolean {
+  const normalized = normalizeSizeLabel(value);
+  return normalized !== null && RETIRED_SIZE_LABELS.has(normalized);
 }
 
 export function sizeProfileForModel(

@@ -264,6 +264,21 @@ describe("DemoInventoryRepository", () => {
     expect(snapshot.balances[created.id]).toBe(0);
   });
 
+  it.each(["38.5", "43.5"])(
+    "rejects retired size %s without reactivating the legacy variant",
+    async (size) => {
+      const repository = new DemoInventoryRepository(new MemoryStorage());
+      const snapshot = await repository.load();
+      const model = snapshot.models[0];
+      const color = snapshot.colors[0];
+
+      await expect(
+        repository.ensureVariant(model.id, color.id, size),
+      ).rejects.toThrow("ไซซ์นี้ถูกยกเลิกการใช้งานแล้ว");
+      expect((await repository.load()).variants).toEqual(snapshot.variants);
+    },
+  );
+
   it("rejects catalog duplicates without case or surrounding-space sensitivity", async () => {
     const repository = new DemoInventoryRepository(new MemoryStorage());
     await expect(repository.addColor(" black ")).rejects.toThrow(/ชื่อ.*ซ้ำ/);

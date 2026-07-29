@@ -49,7 +49,7 @@ describe("Supabase inventory mapping", () => {
     });
 
     expect(snapshot.version).toBe(1);
-    expect(snapshot.variants[0].size).toBe("38.5");
+    expect(snapshot.variants[0]).toMatchObject({ size: "38.5", active: false });
     expect(snapshot.balances).toEqual({ "variant-1": 7 });
     expect(snapshot.documents[0].lines).toEqual([
       {

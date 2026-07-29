@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   compareSizeLabels,
   formatSizeOption,
+  isRetiredSizeLabel,
   normalizeSizeLabel,
   sizeProfileForModel,
 } from "@/features/inventory/domain/size-label";
@@ -21,6 +22,13 @@ describe("size labels", () => {
     "rejects invalid label %p",
     (input) => expect(normalizeSizeLabel(input)).toBeNull(),
   );
+
+  it("retires only the two legacy half-size labels", () => {
+    expect(isRetiredSizeLabel("38.5")).toBe(true);
+    expect(isRetiredSizeLabel(" 43.5 ")).toBe(true);
+    expect(isRetiredSizeLabel("44.5")).toBe(false);
+    expect(isRetiredSizeLabel("38")).toBe(false);
+  });
 
   it("exposes the approved profiles and detailed selector copy", () => {
     expect(sizeProfileForModel("paris").map((entry) => entry.label)).toEqual([

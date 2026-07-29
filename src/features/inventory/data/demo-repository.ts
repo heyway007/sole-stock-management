@@ -8,7 +8,10 @@ import type {
   StockDocumentInput,
   StockDocumentLine,
 } from "@/features/inventory/domain/types";
-import { normalizeSizeLabel } from "@/features/inventory/domain/size-label";
+import {
+  isRetiredSizeLabel,
+  normalizeSizeLabel,
+} from "@/features/inventory/domain/size-label";
 import type { InventoryRepository } from "./inventory-repository";
 import { createSeedSnapshot } from "./seed";
 
@@ -255,6 +258,9 @@ export class DemoInventoryRepository implements InventoryRepository {
   async ensureVariant(modelId: string, colorId: string, size: string): Promise<ProductVariant> {
     const normalizedSize = normalizeSizeLabel(size);
     if (!normalizedSize) throw new Error("กรุณาระบุไซซ์รองเท้า");
+    if (isRetiredSizeLabel(normalizedSize)) {
+      throw new Error("ไซซ์นี้ถูกยกเลิกการใช้งานแล้ว");
+    }
     return this.mutate((snapshot) => {
       if (!snapshot.models.some((model) => model.id === modelId && model.active)) {
         throw new Error("ไม่พบรุ่นรองเท้าที่เปิดใช้งาน");

@@ -440,6 +440,23 @@ describe("SupabaseInventoryRepository client contract", () => {
     expect(client.tableCalls).toHaveLength(0);
   });
 
+  it.each(["38.5", "43.5"])(
+    "rejects retired size %s before calling Supabase",
+    async (size) => {
+      const client = new ContractClient();
+      const repository = new SupabaseInventoryRepository(
+        "https://example.supabase.co",
+        "anon",
+        asClient(client),
+      );
+
+      await expect(
+        repository.ensureVariant("model-1", "color-1", size),
+      ).rejects.toThrow("ไซซ์นี้ถูกยกเลิกการใช้งานแล้ว");
+      expect(client.rpcCalls).toHaveLength(0);
+    },
+  );
+
   it.each([
     ["empty identity", { id: "", modelId: "model-1", colorId: "color-1", size: "2XL", lowStockThreshold: 3, active: true }],
     ["empty model", { id: "variant-2", modelId: "", colorId: "color-1", size: "2XL", lowStockThreshold: 3, active: true }],

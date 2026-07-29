@@ -10,7 +10,10 @@ import type {
   StockDocumentInput,
   StockDocumentLine,
 } from "@/features/inventory/domain/types";
-import { normalizeSizeLabel } from "@/features/inventory/domain/size-label";
+import {
+  isRetiredSizeLabel,
+  normalizeSizeLabel,
+} from "@/features/inventory/domain/size-label";
 import type { InventoryRepository } from "./inventory-repository";
 
 export const PENDING_POSTS_STORAGE_KEY = "sole-stock.supabase.pending-posts.v1";
@@ -347,7 +350,7 @@ export function mapInventorySnapshot(rows: InventoryDatabaseRows): InventorySnap
       colorId: variant.color_id,
       size: variant.size,
       lowStockThreshold: variant.low_stock_threshold,
-      active: variant.active,
+      active: variant.active && !isRetiredSizeLabel(variant.size),
     })),
     balances,
     documents: rows.documents.map((document) =>
@@ -620,6 +623,9 @@ export class SupabaseInventoryRepository implements InventoryRepository {
   async ensureVariant(modelId: string, colorId: string, size: string): Promise<ProductVariant> {
     const normalizedSize = normalizeSizeLabel(size);
     if (!normalizedSize) throw new Error("กรุณาระบุไซซ์รองเท้า");
+    if (isRetiredSizeLabel(normalizedSize)) {
+      throw new Error("ไซซ์นี้ถูกยกเลิกการใช้งานแล้ว");
+    }
     const result = await this.client.rpc("ensure_product_variant", {
       p_model_id: modelId,
       p_color_id: colorId,

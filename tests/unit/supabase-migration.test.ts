@@ -15,6 +15,10 @@ const pricingMigrationPath = resolve(
   process.cwd(),
   "supabase/migrations/202607230006_production_order_pricing.sql",
 );
+const retiredSizesMigrationPath = resolve(
+  process.cwd(),
+  "supabase/migrations/202607290007_retire_legacy_half_sizes.sql",
+);
 
 describe("Supabase inventory migration ACL", () => {
   it("revokes broad catalog writes before granting only the required columns", () => {
@@ -180,6 +184,24 @@ describe("Supabase production-order pricing migration", () => {
     );
     expect(pricingMigration).not.toMatch(
       /delete\s+from\s+public\.production_orders/,
+    );
+  });
+});
+
+describe("Supabase retired half-size migration", () => {
+  it("deactivates only the legacy half sizes without deleting history", () => {
+    const retirementMigration = readFileSync(retiredSizesMigrationPath, "utf8")
+      .replaceAll("\r\n", "\n")
+      .toLocaleLowerCase("en-US");
+
+    expect(retirementMigration).toContain(
+      "where size in ('38.5', '43.5')",
+    );
+    expect(retirementMigration).toContain(
+      "not (active and size in ('38.5', '43.5'))",
+    );
+    expect(retirementMigration).not.toMatch(
+      /delete\s+from\s+public\.(?:product_variants|inventory_balances|stock_documents|production_orders)/,
     );
   });
 });
