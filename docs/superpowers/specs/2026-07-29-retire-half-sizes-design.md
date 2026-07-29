@@ -29,12 +29,17 @@ screens already exclude inactive variants, so the labels disappear from the
 inventory page, receiving, issuing, exchanges, and production-order
 selection without weakening history.
 
+Persisted demo snapshots receive the same compatibility projection during
+load: the variant identity and historical document lines remain intact while
+the retired variant becomes inactive.
+
 Both demo and Supabase repositories reject attempts to create or reactivate
 a retired label. This prevents the "add new size" flow from bringing the
 labels back before or after the database migration.
 
-A forward-only migration sets every matching product variant inactive and
-adds a database constraint that prevents either label from being active.
+A forward-only migration first adds a `NOT VALID` database constraint so new
+writes cannot create or reactivate either label, then sets every matching
+product variant inactive and validates the constraint.
 The migration must not delete product variants, balances, stock documents,
 stock-document lines, production orders, or production-order lines.
 

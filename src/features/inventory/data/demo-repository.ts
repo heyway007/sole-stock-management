@@ -159,7 +159,13 @@ function projectPersistedSnapshot(value: unknown): InventorySnapshot | null {
   const variants = value.variants.map((candidate) => {
     if (!isRecord(candidate)) return candidate;
     const size = normalizeSizeLabel(candidate.size);
-    return size ? { ...candidate, size } : candidate;
+    return size
+      ? {
+          ...candidate,
+          size,
+          active: isRetiredSizeLabel(size) ? false : candidate.active,
+        }
+      : candidate;
   });
   const identities = new Set<string>();
   for (const candidate of variants) {

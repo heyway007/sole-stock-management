@@ -200,8 +200,20 @@ describe("Supabase retired half-size migration", () => {
     expect(retirementMigration).toContain(
       "not (active and size in ('38.5', '43.5'))",
     );
+    const constraintIndex = retirementMigration.indexOf(
+      "add constraint product_variants_retired_half_sizes_inactive",
+    );
+    const updateIndex = retirementMigration.indexOf(
+      "update public.product_variants",
+    );
+    const validationIndex = retirementMigration.indexOf(
+      "validate constraint product_variants_retired_half_sizes_inactive",
+    );
+    expect(retirementMigration).toContain("not valid");
+    expect(constraintIndex).toBeLessThan(updateIndex);
+    expect(updateIndex).toBeLessThan(validationIndex);
     expect(retirementMigration).not.toMatch(
-      /delete\s+from\s+public\.(?:product_variants|inventory_balances|stock_documents|production_orders)/,
+      /delete\s+from\s+public\.(?:product_variants|inventory_balances|stock_documents|stock_document_lines|production_orders|production_order_lines)/,
     );
   });
 });

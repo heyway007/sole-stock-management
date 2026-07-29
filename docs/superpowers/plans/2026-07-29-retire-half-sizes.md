@@ -22,7 +22,9 @@
 **Files:**
 - Modify: `tests/unit/size-label.test.ts`
 - Modify: `tests/unit/supabase-mapping.test.ts`
+- Modify: `tests/unit/demo-repository.test.ts`
 - Modify: `src/features/inventory/domain/size-label.ts`
+- Modify: `src/features/inventory/data/demo-repository.ts`
 - Modify: `src/features/inventory/data/supabase-repository.ts`
 
 **Interfaces:**
@@ -36,11 +38,13 @@ expect(isRetiredSizeLabel("38.5")).toBe(true);
 expect(isRetiredSizeLabel("43.5")).toBe(true);
 expect(isRetiredSizeLabel("44.5")).toBe(false);
 expect(snapshot.variants[0]).toMatchObject({ size: "38.5", active: false });
+expect(persistedDemo.variants[0]).toMatchObject({ size: "38.5", active: false });
+expect(persistedDemo.documents[0].lines).toHaveLength(1);
 ```
 
 - [ ] **Step 2: Verify the tests fail**
 
-Run: `npm test -- tests/unit/size-label.test.ts tests/unit/supabase-mapping.test.ts`
+Run: `npm test -- tests/unit/size-label.test.ts tests/unit/supabase-mapping.test.ts tests/unit/demo-repository.test.ts`
 
 Expected: FAIL because `isRetiredSizeLabel` does not exist and the mapped
 variant remains active.
@@ -62,9 +66,12 @@ Map Supabase variants with:
 active: variant.active && !isRetiredSizeLabel(variant.size)
 ```
 
+Apply the same inactive projection while loading persisted demo variants,
+without removing their identity or historical document references.
+
 - [ ] **Step 4: Verify the tests pass**
 
-Run: `npm test -- tests/unit/size-label.test.ts tests/unit/supabase-mapping.test.ts`
+Run: `npm test -- tests/unit/size-label.test.ts tests/unit/supabase-mapping.test.ts tests/unit/demo-repository.test.ts`
 
 Expected: PASS.
 
@@ -133,7 +140,7 @@ expect(retirementMigration).toContain(
   "not (active and size in ('38.5', '43.5'))",
 );
 expect(retirementMigration).not.toMatch(
-  /delete\s+from\s+public\.(?:product_variants|inventory_balances|stock_documents|production_orders)/,
+  /delete\s+from\s+public\.(?:product_variants|inventory_balances|stock_documents|stock_document_lines|production_orders|production_order_lines)/,
 );
 ```
 
@@ -148,14 +155,18 @@ Expected: FAIL because the retirement migration does not exist.
 ```sql
 begin;
 
+alter table public.product_variants
+  add constraint product_variants_retired_half_sizes_inactive
+  check (not (active and size in ('38.5', '43.5')))
+  not valid;
+
 update public.product_variants
 set active = false,
     updated_at = statement_timestamp()
 where size in ('38.5', '43.5');
 
 alter table public.product_variants
-  add constraint product_variants_retired_half_sizes_inactive
-  check (not (active and size in ('38.5', '43.5')));
+  validate constraint product_variants_retired_half_sizes_inactive;
 
 commit;
 ```

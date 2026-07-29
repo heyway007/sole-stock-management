@@ -79,6 +79,41 @@ describe("DemoInventoryRepository", () => {
     expect(upgraded.balances).toEqual(originalBalances);
   });
 
+  it("retires persisted legacy half sizes while preserving historical lines", async () => {
+    const storage = new MemoryStorage();
+    const legacy = createSeedSnapshot();
+    const variant = legacy.variants[0];
+    legacy.variants[0] = { ...variant, size: "38.5", active: true };
+    legacy.documents = [{
+      id: "legacy-receipt",
+      number: "STK-20260701-000001",
+      type: "RECEIPT",
+      effectiveDate: "2026-07-01",
+      reference: "",
+      note: "",
+      createdAt: "2026-07-01T00:00:00.000Z",
+      lines: [{
+        id: "legacy-receipt-line",
+        variantId: variant.id,
+        delta: 1,
+      }],
+    }];
+    storage.setItem(INVENTORY_STORAGE_KEY, JSON.stringify(legacy));
+
+    const upgraded = await new DemoInventoryRepository(storage).load();
+
+    expect(upgraded.variants[0]).toMatchObject({
+      id: variant.id,
+      size: "38.5",
+      active: false,
+    });
+    expect(upgraded.documents[0].lines).toEqual([{
+      id: "legacy-receipt-line",
+      variantId: variant.id,
+      delta: 1,
+    }]);
+  });
+
   it("persists a catalog mutation across repository instances", async () => {
     const storage = new MemoryStorage();
     await new DemoInventoryRepository(storage).addModel("  Runner  ");
