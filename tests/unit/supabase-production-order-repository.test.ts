@@ -237,4 +237,24 @@ describe("SupabaseProductionOrderRepository", () => {
       );
     }
   });
+
+  it("loads legacy production-order lines when the server omits unitPrice", async () => {
+    const client = new ContractClient();
+    const legacyLine = Object.fromEntries(
+      Object.entries(openOrder.lines[0]).filter(([key]) => key !== "unitPrice"),
+    );
+    client.rpcResults.push({
+      data: [{ ...openOrder, lines: [legacyLine] }],
+      error: null,
+    });
+    const repository = new SupabaseProductionOrderRepository(
+      "https://example.supabase.co",
+      "anon",
+      asClient(client),
+    );
+
+    await expect(repository.load()).resolves.toMatchObject([
+      { lines: [{ unitPrice: null }] },
+    ]);
+  });
 });

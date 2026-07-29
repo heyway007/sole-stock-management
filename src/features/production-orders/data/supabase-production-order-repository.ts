@@ -51,7 +51,7 @@ function isStatus(value: unknown): value is ProductionOrderStatus {
 
 function mappedLine(value: unknown): ProductionOrderLine {
   const size = isRecord(value) ? normalizeSizeLabel(value.size) : null;
-  const unitPrice = isRecord(value) ? value.unitPrice : undefined;
+  const unitPrice = isRecord(value) ? value.unitPrice ?? null : undefined;
   if (!isRecord(value)
     || !isNonEmptyString(value.id)
     || !isNonEmptyString(value.variantId)
