@@ -11,7 +11,7 @@ import type {
   ProductionOrderLineInput,
   ProductionOrderReceiptResult,
 } from "../domain/types";
-import { amountToMinor } from "../domain/money";
+import { amountToMinor, discountAmountToMinor } from "../domain/money";
 import {
   ProductionOrderValidationException,
   validateProductionOrder,
@@ -84,6 +84,7 @@ export class DemoProductionOrderRepository implements ProductionOrderRepository 
             orderDate: validated.data.orderDate,
             expectedDate: validated.data.expectedDate,
             note: validated.data.note,
+            discount: validated.data.discount,
             updatedAt: now,
             lines,
           }
@@ -93,6 +94,7 @@ export class DemoProductionOrderRepository implements ProductionOrderRepository 
             orderDate: validated.data.orderDate,
             expectedDate: validated.data.expectedDate,
             note: validated.data.note,
+            discount: validated.data.discount,
             status: "OPEN",
             receivedDocumentId: null,
             createdAt: now,
@@ -300,6 +302,8 @@ function isProductionOrderRecord(value: unknown): value is ProductionOrder {
     || typeof value.orderDate !== "string"
     || typeof value.expectedDate !== "string"
     || typeof value.note !== "string"
+    || typeof value.discount !== "number"
+    || discountAmountToMinor(value.discount) === null
     || !["OPEN", "RECEIVED", "CANCELLED"].includes(String(value.status))
     || (value.receivedDocumentId !== null && typeof value.receivedDocumentId !== "string")
     || typeof value.createdAt !== "string"
@@ -360,6 +364,7 @@ function projectDemoState(value: unknown): DemoState | null {
     }
     return {
       ...candidate,
+      discount: "discount" in candidate ? candidate.discount : 0,
       lines: candidate.lines.map((line) => {
         if (!isRecord(line)) return line;
         const size = normalizeSizeLabel(line.size);

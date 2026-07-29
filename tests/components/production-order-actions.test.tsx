@@ -30,6 +30,7 @@ const openOrder: ProductionOrder = {
   orderDate: "2026-07-22",
   expectedDate: "2026-08-05",
   note: "",
+  discount: 0,
   status: "OPEN",
   receivedDocumentId: null,
   createdAt: "2026-07-22T10:00:00.000Z",
