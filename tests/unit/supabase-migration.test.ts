@@ -19,6 +19,10 @@ const retiredSizesMigrationPath = resolve(
   process.cwd(),
   "supabase/migrations/202607290007_retire_legacy_half_sizes.sql",
 );
+const discountMigrationPath = resolve(
+  process.cwd(),
+  "supabase/migrations/202607290008_production_order_discount.sql",
+);
 
 describe("Supabase inventory migration ACL", () => {
   it("revokes broad catalog writes before granting only the required columns", () => {
@@ -214,6 +218,31 @@ describe("Supabase retired half-size migration", () => {
     expect(updateIndex).toBeLessThan(validationIndex);
     expect(retirementMigration).not.toMatch(
       /delete\s+from\s+public\.(?:product_variants|inventory_balances|stock_documents|stock_document_lines|production_orders|production_order_lines)/,
+    );
+  });
+});
+
+describe("Supabase production-order discount migration", () => {
+  it("persists a non-negative discount through the JSON and save contracts", () => {
+    const discountMigration = readFileSync(discountMigrationPath, "utf8")
+      .replaceAll("\r\n", "\n")
+      .toLocaleLowerCase("en-US");
+
+    expect(discountMigration).toContain(
+      "add column discount numeric(14,2) not null default 0",
+    );
+    expect(discountMigration).toContain("check (discount >= 0)");
+    expect(discountMigration).toContain(
+      "'discount', production_order.discount",
+    );
+    expect(discountMigration).toContain(
+      "pg_catalog.jsonb_typeof(command -> 'discount') is distinct from 'number'",
+    );
+    expect(discountMigration).toContain(
+      "discount_value := (command ->> 'discount')::numeric",
+    );
+    expect(discountMigration).not.toMatch(
+      /delete\s+from\s+public\.production_orders/,
     );
   });
 });

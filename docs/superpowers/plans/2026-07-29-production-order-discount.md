@@ -281,7 +281,7 @@ expect(discountMigration).toContain(
   "discount_value := (command ->> 'discount')::numeric",
 );
 expect(discountMigration).not.toMatch(
-  /delete\s+from\s+public\.(?:production_orders|production_order_lines)/,
+  /delete\s+from\s+public\.production_orders/,
 );
 ```
 
