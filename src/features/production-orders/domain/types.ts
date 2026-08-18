@@ -24,7 +24,19 @@ export interface ProductionOrderLine {
   colorName: string;
   size: string;
   quantity: number;
+  receivedQuantity: number;
   unitPrice: number | null;
+}
+
+export interface ProductionOrderReceiptLineInput {
+  lineId: string;
+  quantity: number;
+}
+
+export interface ProductionOrderReceiptInput {
+  orderId: string;
+  effectiveDate: string;
+  lines?: ProductionOrderReceiptLineInput[];
 }
 
 export interface ProductionOrder {
@@ -35,6 +47,7 @@ export interface ProductionOrder {
   note: string;
   status: ProductionOrderStatus;
   receivedDocumentId: string | null;
+  receiptDocumentIds: string[];
   createdAt: string;
   updatedAt: string;
   receivedAt: string | null;

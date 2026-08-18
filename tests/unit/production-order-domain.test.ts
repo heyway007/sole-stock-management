@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { filterProductionOrders, summarizeProductionOrder } from "@/features/production-orders/domain/selectors";
-import type { ProductionOrder, ProductionOrderInput } from "@/features/production-orders/domain/types";
+import type {
+  ProductionOrder,
+  ProductionOrderInput,
+  ProductionOrderReceiptInput,
+} from "@/features/production-orders/domain/types";
 import { validateProductionOrder } from "@/features/production-orders/domain/validation";
 
 const validInput: ProductionOrderInput = {
@@ -21,6 +25,7 @@ const order: ProductionOrder = {
   note: "รอบต้นเดือน",
   status: "OPEN",
   receivedDocumentId: null,
+  receiptDocumentIds: [],
   createdAt: "2026-07-22T10:00:00.000Z",
   updatedAt: "2026-07-22T10:00:00.000Z",
   receivedAt: null,
@@ -34,6 +39,7 @@ const order: ProductionOrder = {
       colorName: "Black",
       size: "M",
       quantity: 4,
+      receivedQuantity: 0,
       unitPrice: 327,
     },
     {
@@ -44,6 +50,7 @@ const order: ProductionOrder = {
       colorName: "Black",
       size: "L",
       quantity: 6,
+      receivedQuantity: 0,
       unitPrice: 265,
     },
   ],
@@ -93,5 +100,19 @@ describe("production-order domain", () => {
     });
     expect(filterProductionOrders([order], { query: "paris black", status: "ALL" })).toEqual([order]);
     expect(filterProductionOrders([order], { query: "", status: "RECEIVED" })).toEqual([]);
+  });
+
+  it("describes a partial receipt without changing the requested quantity", () => {
+    const receipt: ProductionOrderReceiptInput = {
+      orderId: order.id,
+      effectiveDate: "2026-08-18",
+      lines: [{ lineId: order.lines[0].id, quantity: 2 }],
+    };
+
+    expect(receipt).toEqual({
+      orderId: "order-1",
+      effectiveDate: "2026-08-18",
+      lines: [{ lineId: "line-1", quantity: 2 }],
+    });
   });
 });

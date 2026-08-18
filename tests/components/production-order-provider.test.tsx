@@ -30,6 +30,7 @@ const openOrder: ProductionOrder = {
   note: "",
   status: "OPEN",
   receivedDocumentId: null,
+  receiptDocumentIds: [],
   createdAt: "2026-07-22T10:00:00.000Z",
   updatedAt: "2026-07-22T10:00:00.000Z",
   receivedAt: null,
@@ -42,6 +43,7 @@ const openOrder: ProductionOrder = {
     colorName: "Black",
     size: "M",
     quantity: 4,
+    receivedQuantity: 0,
     unitPrice: 327,
   }],
 };
@@ -64,6 +66,7 @@ class FakeProductionOrderRepository implements ProductionOrderRepository {
       ...this.orders.find((order) => order.id === orderId)!,
       status: "RECEIVED",
       receivedDocumentId: "document-1",
+      receiptDocumentIds: ["document-1"],
       receivedAt: "2026-07-22T11:00:00.000Z",
     };
     this.orders = [received];

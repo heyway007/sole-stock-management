@@ -11,13 +11,14 @@ const openOrder: ProductionOrder = {
   note: "ส่งก่อนเที่ยง",
   status: "OPEN",
   receivedDocumentId: null,
+  receiptDocumentIds: [],
   createdAt: "2026-07-22T10:00:00.000Z",
   updatedAt: "2026-07-22T10:00:00.000Z",
   receivedAt: null,
   cancelledAt: null,
   lines: [
-    { id: "line-1", variantId: "variant-1", lineNumber: 1, modelName: "Paris", colorName: "Black", size: "M", quantity: 4, unitPrice: 327 },
-    { id: "line-2", variantId: "variant-2", lineNumber: 2, modelName: "Paris", colorName: "Black", size: "L", quantity: 6, unitPrice: 265 },
+    { id: "line-1", variantId: "variant-1", lineNumber: 1, modelName: "Paris", colorName: "Black", size: "M", quantity: 4, receivedQuantity: 0, unitPrice: 327 },
+    { id: "line-2", variantId: "variant-2", lineNumber: 2, modelName: "Paris", colorName: "Black", size: "L", quantity: 6, receivedQuantity: 0, unitPrice: 265 },
   ],
 };
 

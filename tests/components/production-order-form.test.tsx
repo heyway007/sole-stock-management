@@ -98,6 +98,7 @@ describe("ProductionOrderForm", () => {
       note: "",
       status: "CANCELLED",
       receivedDocumentId: null,
+      receiptDocumentIds: [],
       createdAt: "2026-07-22T10:00:00.000Z",
       updatedAt: "2026-07-22T11:00:00.000Z",
       receivedAt: null,
@@ -110,6 +111,7 @@ describe("ProductionOrderForm", () => {
         colorName: "Black",
         size: "M",
         quantity: 4,
+        receivedQuantity: 0,
         unitPrice: null,
       }],
     });

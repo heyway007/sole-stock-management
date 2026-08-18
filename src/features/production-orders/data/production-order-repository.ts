@@ -1,6 +1,7 @@
 import type {
   ProductionOrder,
   ProductionOrderInput,
+  ProductionOrderReceiptInput,
   ProductionOrderReceiptResult,
 } from "../domain/types";
 
@@ -9,5 +10,5 @@ export interface ProductionOrderRepository {
   subscribe?(listener: () => void): () => void;
   save(input: ProductionOrderInput): Promise<ProductionOrder>;
   cancel(orderId: string): Promise<ProductionOrder>;
-  receive(orderId: string, effectiveDate: string): Promise<ProductionOrderReceiptResult>;
+  receive(input: ProductionOrderReceiptInput): Promise<ProductionOrderReceiptResult>;
 }
