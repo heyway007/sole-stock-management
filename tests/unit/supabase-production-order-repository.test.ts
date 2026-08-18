@@ -42,6 +42,7 @@ const openOrder = {
   note: "รอบแรก",
   status: "OPEN",
   receivedDocumentId: null,
+  receiptDocumentIds: [],
   createdAt: "2026-07-22T10:00:00.000Z",
   updatedAt: "2026-07-22T10:00:00.000Z",
   receivedAt: null,
@@ -54,6 +55,7 @@ const openOrder = {
     colorName: "Black",
     size: "M",
     quantity: 4,
+    receivedQuantity: 0,
     unitPrice: 327.5,
   }],
 } satisfies Json;
@@ -81,6 +83,7 @@ describe("SupabaseProductionOrderRepository", () => {
       ...openOrder,
       status: "RECEIVED",
       receivedDocumentId: "document-1",
+      receiptDocumentIds: ["document-1"],
       receivedAt: "2026-07-22T10:05:00.000Z",
     } satisfies Json;
     client.rpcResults.push(
@@ -106,7 +109,7 @@ describe("SupabaseProductionOrderRepository", () => {
       lines: [{ variantId: "variant-1", quantity: 4, unitPrice: 327.5 }],
     })).resolves.toMatchObject({ status: "OPEN" });
     await expect(repository.cancel("order-1")).resolves.toMatchObject({ status: "CANCELLED" });
-    await expect(repository.receive("order-1", "2026-07-22")).resolves.toMatchObject({
+    await expect(repository.receive({ orderId: "order-1", effectiveDate: "2026-07-22" })).resolves.toMatchObject({
       order: { status: "RECEIVED" },
       document: { number: "STK-20260722-0001", type: "RECEIPT" },
     });
@@ -128,6 +131,38 @@ describe("SupabaseProductionOrderRepository", () => {
         name: "receive_production_order",
         args: { command: { requestId: "request-receive", orderId: "order-1", effectiveDate: "2026-07-22" } },
       },
+    ]);
+  });
+
+  it("keeps distinct partial commands on distinct retry identities", async () => {
+    const client = new ContractClient();
+    client.rpcResults.push(
+      { data: { order: openOrder, document: receiptDocument }, error: null },
+      { data: { order: openOrder, document: { ...receiptDocument, id: "document-2" } }, error: null },
+    );
+    const requestIds = ["request-line-one", "request-line-two"];
+    const repository = new SupabaseProductionOrderRepository(
+      "https://example.supabase.co",
+      "anon",
+      asClient(client),
+      () => requestIds.shift() ?? "unexpected-request",
+      new MemoryStorage(),
+    );
+
+    await repository.receive({
+      orderId: "order-1",
+      effectiveDate: "2026-07-22",
+      lines: [{ lineId: "line-1", quantity: 2 }],
+    });
+    await repository.receive({
+      orderId: "order-1",
+      effectiveDate: "2026-07-22",
+      lines: [{ lineId: "line-1", quantity: 1 }],
+    });
+
+    expect(client.rpcCalls.map((call) => call.args)).toEqual([
+      { command: { requestId: "request-line-one", orderId: "order-1", effectiveDate: "2026-07-22", lines: [{ lineId: "line-1", quantity: 2 }] } },
+      { command: { requestId: "request-line-two", orderId: "order-1", effectiveDate: "2026-07-22", lines: [{ lineId: "line-1", quantity: 1 }] } },
     ]);
   });
 

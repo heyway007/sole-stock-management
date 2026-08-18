@@ -19,6 +19,10 @@ const retiredSizesMigrationPath = resolve(
   process.cwd(),
   "supabase/migrations/202607290007_retire_legacy_half_sizes.sql",
 );
+const partialReceiptMigrationPath = resolve(
+  process.cwd(),
+  "supabase/migrations/202608180008_partial_production_order_receipts.sql",
+);
 
 describe("Supabase inventory migration ACL", () => {
   it("revokes broad catalog writes before granting only the required columns", () => {
@@ -165,6 +169,34 @@ describe("Supabase text-size migration", () => {
     expect(sizeMigration).not.toMatch(
       /delete\s+from\s+public\.(?:product_variants|inventory_balances|stock_documents|production_orders)/,
     );
+  });
+});
+
+describe("Supabase partial production receipt migration", () => {
+  it("persists line progress and receipt history without broad browser writes", () => {
+    const partialMigration = readFileSync(partialReceiptMigrationPath, "utf8")
+      .replaceAll("\r\n", "\n")
+      .toLocaleLowerCase("en-US");
+
+    expect(partialMigration).toContain("received_quantity integer not null default 0");
+    expect(partialMigration).toContain("create table public.production_order_receipts");
+    expect(partialMigration).toContain("check (received_quantity >= 0 and received_quantity <= quantity)");
+    expect(partialMigration).toContain("backfill");
+    expect(partialMigration).toContain("grant execute on function public.receive_production_order(jsonb) to anon, authenticated;");
+    expect(partialMigration).not.toMatch(/grant\s+(?:insert|update|delete)\s+on\s+public\.production_/);
+  });
+
+  it("validates selected quantities and locks the order before posting stock", () => {
+    const partialMigration = readFileSync(partialReceiptMigrationPath, "utf8")
+      .replaceAll("\r\n", "\n")
+      .toLocaleLowerCase("en-US");
+
+    expect(partialMigration).toContain("for update of production_order");
+    expect(partialMigration).toContain("jsonb_array_elements(command -> 'lines')");
+    expect(partialMigration).toContain("post_stock_document(receipt_command)");
+    expect(partialMigration).toContain("received_quantity = line.received_quantity + selected_quantity");
+    expect(partialMigration).toContain("not exists (");
+    expect(partialMigration).toContain("status = 'received'");
   });
 });
 

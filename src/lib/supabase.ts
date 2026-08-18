@@ -8,6 +8,13 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 
+export type ProductionOrderReceiptCommand = {
+  requestId: string;
+  orderId: string;
+  effectiveDate: string;
+  lines?: Json[];
+};
+
 type ShoeModelRow = {
   id: string;
   name: string;
@@ -166,7 +173,7 @@ export interface InventoryDatabase {
         Returns: Json;
       };
       receive_production_order: {
-        Args: { command: Json };
+        Args: { command: ProductionOrderReceiptCommand };
         Returns: Json;
       };
     };

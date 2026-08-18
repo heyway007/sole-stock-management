@@ -11,6 +11,7 @@ import type {
   ProductionOrder,
   ProductionOrderInput,
   ProductionOrderLine,
+  ProductionOrderReceiptInput,
   ProductionOrderReceiptResult,
   ProductionOrderStatus,
 } from "../domain/types";
@@ -49,9 +50,12 @@ function isStatus(value: unknown): value is ProductionOrderStatus {
   return value === "OPEN" || value === "RECEIVED" || value === "CANCELLED";
 }
 
-function mappedLine(value: unknown): ProductionOrderLine {
+function mappedLine(value: unknown, status: ProductionOrderStatus): ProductionOrderLine {
   const size = isRecord(value) ? normalizeSizeLabel(value.size) : null;
   const unitPrice = isRecord(value) ? value.unitPrice ?? null : undefined;
+  const receivedQuantity = isRecord(value) && value.receivedQuantity !== undefined
+    ? value.receivedQuantity
+    : isRecord(value) && status === "RECEIVED" ? value.quantity : 0;
   if (!isRecord(value)
     || !isNonEmptyString(value.id)
     || !isNonEmptyString(value.variantId)
@@ -66,6 +70,10 @@ function mappedLine(value: unknown): ProductionOrderLine {
     || typeof value.quantity !== "number"
     || !Number.isInteger(value.quantity)
     || value.quantity < 1
+    || typeof receivedQuantity !== "number"
+    || !Number.isInteger(receivedQuantity)
+    || receivedQuantity < 0
+    || receivedQuantity > value.quantity
     || (unitPrice !== null
       && (typeof unitPrice !== "number" || amountToMinor(unitPrice) === null))) {
     throw new Error("ข้อมูลใบผลิตจากเซิร์ฟเวอร์ไม่ถูกต้อง");
@@ -78,6 +86,7 @@ function mappedLine(value: unknown): ProductionOrderLine {
     colorName: value.colorName,
     size,
     quantity: value.quantity,
+    receivedQuantity,
     unitPrice,
   };
 }
@@ -100,9 +109,17 @@ function mappedOrder(value: unknown): ProductionOrder {
     || value.lines.length === 0) {
     throw new Error("ข้อมูลใบผลิตจากเซิร์ฟเวอร์ไม่ถูกต้อง");
   }
-  const lines = value.lines.map(mappedLine);
+  const status = value.status as ProductionOrderStatus;
+  const lines = value.lines.map((line) => mappedLine(line, status));
+  const receiptDocumentIds = value.receiptDocumentIds === undefined
+    ? value.receivedDocumentId ? [value.receivedDocumentId] : []
+    : value.receiptDocumentIds;
+  if (!Array.isArray(receiptDocumentIds)
+    || !receiptDocumentIds.every((documentId) => isNonEmptyString(documentId))) {
+    throw new Error("à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¹ƒà¸šà¸œà¸¥à¸´à¸•à¸ˆà¸²à¸à¹€à¸‹à¸´à¸£à¸Œà¸Ÿà¹€à¸§à¸­à¸£à¹Œà¹„à¸¡à¹ˆà¸–à¸¹à¸à¸•à¹‰à¸­à¸‡");
+  }
   const terminalFieldsAreValid = value.status === "OPEN"
-    ? value.receivedDocumentId === null && value.receivedAt === null && value.cancelledAt === null
+    ? value.receivedAt === null && value.cancelledAt === null
     : value.status === "RECEIVED"
       ? isNonEmptyString(value.receivedDocumentId) && isTimestamp(value.receivedAt) && value.cancelledAt === null
       : value.receivedDocumentId === null && value.receivedAt === null && isTimestamp(value.cancelledAt);
@@ -121,6 +138,7 @@ function mappedOrder(value: unknown): ProductionOrder {
     note: value.note,
     status: value.status,
     receivedDocumentId: value.receivedDocumentId,
+    receiptDocumentIds,
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
     receivedAt: value.receivedAt,
@@ -216,6 +234,13 @@ function commandFor(input: ProductionOrderInput): Json {
   };
 }
 
+function receiptRequestKey(input: ProductionOrderReceiptInput): string {
+  const lines = input.lines
+    ? [...input.lines].sort((left, right) => left.lineId.localeCompare(right.lineId))
+    : null;
+  return `receive:${JSON.stringify({ orderId: input.orderId, effectiveDate: input.effectiveDate, lines })}`;
+}
+
 export class SupabaseProductionOrderRepository implements ProductionOrderRepository {
   private readonly client: InventorySupabaseClient;
   private readonly pending = new Map<string, PendingRequest>();
@@ -264,10 +289,19 @@ export class SupabaseProductionOrderRepository implements ProductionOrderReposit
     return mappedOrder(result.data);
   }
 
-  async receive(orderId: string, effectiveDate: string): Promise<ProductionOrderReceiptResult> {
-    return this.withRequest(`receive:${orderId}`, async (requestId) => {
+  async receive(input: ProductionOrderReceiptInput): Promise<ProductionOrderReceiptResult> {
+    return this.withRequest(receiptRequestKey(input), async (requestId) => {
+      const command: Record<string, Json> = {
+        requestId,
+        orderId: input.orderId,
+        effectiveDate: input.effectiveDate,
+      };
+      if (input.lines) command.lines = input.lines.map((line) => ({
+        lineId: line.lineId,
+        quantity: line.quantity,
+      }));
       const result = await this.client.rpc("receive_production_order", {
-        command: { requestId, orderId, effectiveDate },
+        command,
       });
       throwFor(result.error);
       return mappedReceipt(result.data);
