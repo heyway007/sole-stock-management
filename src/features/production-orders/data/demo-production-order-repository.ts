@@ -387,7 +387,7 @@ function isProductionOrderRecord(value: unknown): value is ProductionOrder {
     ? order.receivedAt === null && order.cancelledAt === null
     : order.status === "RECEIVED"
       ? !!order.receivedDocumentId && !!order.receivedAt && order.cancelledAt === null
-      : order.receivedDocumentId === null && order.receivedAt === null && !!order.cancelledAt;
+      : order.receivedAt === null && !!order.cancelledAt;
   return terminalFieldsAreValid
     && new Set(order.lines.map((line) => line.id)).size === order.lines.length
     && new Set(order.lines.map((line) => line.variantId)).size === order.lines.length;

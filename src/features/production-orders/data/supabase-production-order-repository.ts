@@ -128,7 +128,7 @@ function mappedOrder(value: unknown): ProductionOrder {
     ? value.receivedAt === null && value.cancelledAt === null
     : value.status === "RECEIVED"
       ? isNonEmptyString(value.receivedDocumentId) && isTimestamp(value.receivedAt) && value.cancelledAt === null
-      : value.receivedDocumentId === null && value.receivedAt === null && isTimestamp(value.cancelledAt);
+      : value.receivedAt === null && isTimestamp(value.cancelledAt);
   const lineNumbers = lines.map((line) => line.lineNumber);
   if (!terminalFieldsAreValid
     || new Set(lines.map((line) => line.id)).size !== lines.length

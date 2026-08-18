@@ -73,6 +73,34 @@ const receiptDocument = {
 } satisfies Json;
 
 describe("SupabaseProductionOrderRepository", () => {
+  it("loads a cancelled order that retains partial receipt history", async () => {
+    const client = new ContractClient();
+    client.rpcResults.push({
+      data: [{
+        ...openOrder,
+        status: "CANCELLED",
+        receivedDocumentId: "document-1",
+        receiptDocumentIds: ["document-1"],
+        receivedAt: null,
+        cancelledAt: "2026-07-22T10:10:00.000Z",
+        lines: [{ ...openOrder.lines[0], receivedQuantity: 2 }],
+      }],
+      error: null,
+    });
+    const repository = new SupabaseProductionOrderRepository(
+      "https://example.supabase.co",
+      "anon",
+      asClient(client),
+    );
+
+    await expect(repository.load()).resolves.toMatchObject([{
+      status: "CANCELLED",
+      receivedDocumentId: "document-1",
+      receiptDocumentIds: ["document-1"],
+      lines: [{ receivedQuantity: 2 }],
+    }]);
+  });
+
   it("uses the four RPC contracts and strictly maps orders and receipt documents", async () => {
     const client = new ContractClient();
     const cancelledOrder = {

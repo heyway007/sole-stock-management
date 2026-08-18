@@ -139,6 +139,32 @@ describe("DemoProductionOrderRepository", () => {
     expect(after.balances[order.lines[1].variantId] - before.balances[order.lines[1].variantId]).toBe(0);
   });
 
+  it("keeps a partially received order after cancellation", async () => {
+    const { repository, order } = await fixtureWithOpenOrder();
+    await repository.receive({
+      orderId: order.id,
+      effectiveDate: "2026-07-22",
+      lines: [{ lineId: order.lines[0].id, quantity: 2 }],
+    });
+
+    const cancelled = await repository.cancel(order.id);
+    const loaded = await repository.load();
+
+    expect(cancelled).toMatchObject({
+      status: "CANCELLED",
+      receivedDocumentId: expect.any(String),
+      receivedAt: null,
+      cancelledAt: expect.any(String),
+      lines: expect.arrayContaining([expect.objectContaining({ receivedQuantity: 2 })]),
+    });
+    expect(loaded[0]).toMatchObject({
+      status: "CANCELLED",
+      receivedDocumentId: cancelled.receivedDocumentId,
+      receiptDocumentIds: cancelled.receiptDocumentIds,
+      lines: expect.arrayContaining([expect.objectContaining({ receivedQuantity: 2 })]),
+    });
+  });
+
   it("repeats partial receipts and marks the order received only when every line is complete", async () => {
     const { repository, order } = await fixtureWithOpenOrder();
 
