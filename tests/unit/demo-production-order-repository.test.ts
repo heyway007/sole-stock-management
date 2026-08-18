@@ -188,7 +188,7 @@ describe("DemoProductionOrderRepository", () => {
   });
 
   it("normalizes legacy open orders without received progress fields", async () => {
-    const { storage, inventory, order } = await fixtureWithOpenOrder();
+    const { storage, inventory } = await fixtureWithOpenOrder();
     const persisted = JSON.parse(storage.getItem(PRODUCTION_ORDER_STORAGE_KEY)!);
     delete persisted.receiptRequests;
     delete persisted.orders[0].receiptDocumentIds;

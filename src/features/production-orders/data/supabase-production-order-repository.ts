@@ -3,6 +3,7 @@ import {
   createInventorySupabaseClient,
   type InventorySupabaseClient,
   type Json,
+  type ProductionOrderReceiptCommand,
 } from "@/lib/supabase";
 import type { StockDocument, StockDocumentLine } from "@/features/inventory/domain/types";
 import { normalizeSizeLabel } from "@/features/inventory/domain/size-label";
@@ -291,7 +292,7 @@ export class SupabaseProductionOrderRepository implements ProductionOrderReposit
 
   async receive(input: ProductionOrderReceiptInput): Promise<ProductionOrderReceiptResult> {
     return this.withRequest(receiptRequestKey(input), async (requestId) => {
-      const command: Record<string, Json> = {
+      const command: ProductionOrderReceiptCommand = {
         requestId,
         orderId: input.orderId,
         effectiveDate: input.effectiveDate,
