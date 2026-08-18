@@ -31,6 +31,10 @@ const discountCompatibilityMigrationPath = resolve(
   process.cwd(),
   "supabase/migrations/202607290009_production_order_discount_compatibility.sql",
 );
+const partialReceiptDiscountCompatibilityMigrationPath = resolve(
+  process.cwd(),
+  "supabase/migrations/202608180009_partial_receipt_discount_compatibility.sql",
+);
 
 describe("Supabase inventory migration ACL", () => {
   it("revokes broad catalog writes before granting only the required columns", () => {
@@ -299,6 +303,34 @@ describe("Supabase production-order discount migration", () => {
     );
     expect(compatibilityMigration).not.toContain(
       "alter table public.production_orders",
+    );
+  });
+});
+
+describe("Supabase partial-receipt and discount compatibility migration", () => {
+  it("keeps receipt progress and discount fields after later function replacements", () => {
+    const compatibilityMigration = readFileSync(
+      partialReceiptDiscountCompatibilityMigrationPath,
+      "utf8",
+    ).replaceAll("\r\n", "\n").toLocaleLowerCase("en-US");
+
+    expect(compatibilityMigration).toContain(
+      "'discount', production_order.discount",
+    );
+    expect(compatibilityMigration).toContain(
+      "'receiptdocumentids', coalesce(",
+    );
+    expect(compatibilityMigration).toContain(
+      "'receivedquantity', line.received_quantity",
+    );
+    expect(compatibilityMigration).toContain(
+      "retained_received_by_variant jsonb := '{}'::jsonb",
+    );
+    expect(compatibilityMigration).toContain(
+      "received_quantity, unit_price",
+    );
+    expect(compatibilityMigration).toContain(
+      "discount_value := case when creating then 0 else locked_order.discount end",
     );
   });
 });
