@@ -522,6 +522,7 @@ button, input, select { font: inherit; }
 .production-detail-line-cards article span { color: var(--muted); font-size: 0.78rem; }
 .production-detail-line-cards article > strong { white-space: nowrap; }
 .production-money-cell { white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
+.production-money-header { text-align: right !important; }
 .production-card-amount { display: grid; justify-items: end; gap: 2px; white-space: nowrap; }
 .production-card-amount span { color: var(--muted); font-size: 0.78rem; }
 .production-card-receipt-progress { flex-basis: 100%; color: var(--forest-800); font-size: 0.82rem; font-weight: 700; }

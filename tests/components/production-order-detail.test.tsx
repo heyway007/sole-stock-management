@@ -61,6 +61,8 @@ describe("ProductionOrderDetailPage", () => {
 
     expect(await screen.findByRole("heading", { name: "PO-20260722-000001" })).toBeInTheDocument();
     const table = screen.getByRole("table", { name: "รายการในใบผลิต" });
+    expect(within(table).getByRole("columnheader", { name: "ราคา/หน่วย" })).toHaveClass("production-money-header");
+    expect(within(table).getByRole("columnheader", { name: "จำนวนเงิน" })).toHaveClass("production-money-header");
     expect(within(table).getByText("M")).toBeInTheDocument();
     expect(table).not.toHaveTextContent("24–24.5 cm");
     expect(within(table).getByText("327.00 บาท")).toBeInTheDocument();

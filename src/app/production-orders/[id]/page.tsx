@@ -72,7 +72,7 @@ export function ProductionOrderDetailPageContent() {
       <section className="production-detail-lines" aria-label="รายการสินค้าในใบผลิต">
         <div className="inventory-table-wrap production-detail-table-wrap">
           <table className="inventory-table" aria-label="รายการในใบผลิต">
-            <thead><tr><th>#</th><th>รุ่น</th><th>สี</th><th>ไซซ์</th><th>จำนวน</th><th>รับแล้ว</th><th>ราคา/หน่วย</th><th>จำนวนเงิน</th><th>จัดการ</th></tr></thead>
+            <thead><tr><th>#</th><th>รุ่น</th><th>สี</th><th>ไซซ์</th><th>จำนวน</th><th>รับแล้ว</th><th className="production-money-header">ราคา/หน่วย</th><th className="production-money-header">จำนวนเงิน</th><th>จัดการ</th></tr></thead>
             <tbody>{order.lines.map((line) => (
               <tr key={line.id}>
                 <td>{line.lineNumber}</td>
