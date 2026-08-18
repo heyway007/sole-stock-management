@@ -100,7 +100,7 @@ describe("DemoProductionOrderRepository", () => {
   it("receives every line once and returns the same linked document on retry", async () => {
     const { repository, inventory, order } = await fixtureWithOpenOrder();
     const before = await inventory.load();
-    const result = await repository.receive(order.id, "2026-07-22");
+    const result = await repository.receive({ orderId: order.id, effectiveDate: "2026-07-22" });
     const after = await inventory.load();
 
     expect(result.order).toMatchObject({
@@ -111,8 +111,94 @@ describe("DemoProductionOrderRepository", () => {
     for (const line of order.lines) {
       expect(after.balances[line.variantId] - before.balances[line.variantId]).toBe(line.quantity);
     }
-    await expect(repository.receive(order.id, "2026-07-22")).resolves.toEqual(result);
+    await expect(repository.receive({ orderId: order.id, effectiveDate: "2026-07-22" })).resolves.toEqual(result);
     expect((await inventory.load()).documents).toHaveLength(after.documents.length);
+  });
+
+  it("receives one line partially and leaves the order open with progress", async () => {
+    const { repository, inventory, order } = await fixtureWithOpenOrder();
+    const before = await inventory.load();
+
+    const result = await repository.receive({
+      orderId: order.id,
+      effectiveDate: "2026-07-22",
+      lines: [{ lineId: order.lines[0].id, quantity: 2 }],
+    });
+    const after = await inventory.load();
+
+    expect(result.order.status).toBe("OPEN");
+    expect(result.order.lines[0].receivedQuantity).toBe(2);
+    expect(result.order.lines[1].receivedQuantity).toBe(0);
+    expect(after.balances[order.lines[0].variantId] - before.balances[order.lines[0].variantId]).toBe(2);
+    expect(after.balances[order.lines[1].variantId] - before.balances[order.lines[1].variantId]).toBe(0);
+  });
+
+  it("repeats partial receipts and marks the order received only when every line is complete", async () => {
+    const { repository, order } = await fixtureWithOpenOrder();
+
+    await repository.receive({
+      orderId: order.id,
+      effectiveDate: "2026-07-22",
+      lines: [{ lineId: order.lines[0].id, quantity: 2 }],
+    });
+    const final = await repository.receive({
+      orderId: order.id,
+      effectiveDate: "2026-07-22",
+      lines: [
+        { lineId: order.lines[0].id, quantity: 2 },
+        { lineId: order.lines[1].id, quantity: 5 },
+      ],
+    });
+
+    expect(final.order.status).toBe("RECEIVED");
+    expect(final.order.lines.every((line) => line.receivedQuantity === line.quantity)).toBe(true);
+    expect(final.order.receiptDocumentIds).toHaveLength(2);
+  });
+
+  it("receives only remaining quantities when the page-level command omits lines", async () => {
+    const { repository, inventory, order } = await fixtureWithOpenOrder();
+    await repository.receive({
+      orderId: order.id,
+      effectiveDate: "2026-07-22",
+      lines: [{ lineId: order.lines[0].id, quantity: 1 }],
+    });
+    const before = await inventory.load();
+
+    const result = await repository.receive({ orderId: order.id, effectiveDate: "2026-07-22" });
+    const receiptDeltas = new Map(result.document.lines.map((line) => [line.variantId, line.delta]));
+
+    expect(receiptDeltas.get(order.lines[0].variantId)).toBe(3);
+    expect(receiptDeltas.get(order.lines[1].variantId)).toBe(5);
+    expect(result.order.status).toBe("RECEIVED");
+    expect((await inventory.load()).documents.length).toBe(before.documents.length + 1);
+  });
+
+  it("rejects a partial receipt above the remaining quantity without mutating state", async () => {
+    const { repository, inventory, order } = await fixtureWithOpenOrder();
+    const before = await inventory.load();
+
+    await expect(repository.receive({
+      orderId: order.id,
+      effectiveDate: "2026-07-22",
+      lines: [{ lineId: order.lines[0].id, quantity: 5 }],
+    })).rejects.toThrow();
+
+    expect((await inventory.load()).documents).toEqual(before.documents);
+    expect((await repository.load())[0].lines[0].receivedQuantity).toBe(0);
+  });
+
+  it("normalizes legacy open orders without received progress fields", async () => {
+    const { storage, inventory, order } = await fixtureWithOpenOrder();
+    const persisted = JSON.parse(storage.getItem(PRODUCTION_ORDER_STORAGE_KEY)!);
+    delete persisted.receiptRequests;
+    delete persisted.orders[0].receiptDocumentIds;
+    delete persisted.orders[0].lines[0].receivedQuantity;
+    storage.setItem(PRODUCTION_ORDER_STORAGE_KEY, JSON.stringify(persisted));
+
+    const loaded = await new DemoProductionOrderRepository(storage, inventory).load();
+
+    expect(loaded[0].receiptDocumentIds).toEqual([]);
+    expect(loaded[0].lines[0].receivedQuantity).toBe(0);
   });
 
   it("keeps corrupt persisted data untouched until a successful mutation", async () => {

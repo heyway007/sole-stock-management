@@ -9,6 +9,8 @@ import type {
   ProductionOrderInput,
   ProductionOrderLine,
   ProductionOrderLineInput,
+  ProductionOrderReceiptInput,
+  ProductionOrderReceiptLineInput,
   ProductionOrderReceiptResult,
 } from "../domain/types";
 import { amountToMinor } from "../domain/money";
@@ -33,6 +35,7 @@ interface DemoState {
   revision: number;
   orders: ProductionOrder[];
   receipts: Record<string, StockDocument>;
+  receiptRequests: Record<string, string>;
 }
 
 interface DemoProductionOrderRepositoryOptions {
@@ -75,8 +78,17 @@ export class DemoProductionOrderRepository implements ProductionOrderRepository 
         throw new Error("แก้ไขได้เฉพาะใบผลิตที่รอรับเข้า");
       }
 
+      const previousReceivedByVariant = new Map(
+        existing?.lines.map((line) => [line.variantId, line.receivedQuantity]) ?? [],
+      );
       const lines = validated.data.lines.map((line, index) =>
-        snapshotLine(catalog, line, index + 1, this.createId()));
+        snapshotLine(
+          catalog,
+          line,
+          index + 1,
+          this.createId(),
+          previousReceivedByVariant.get(line.variantId) ?? 0,
+        ));
       const now = this.now();
       const order: ProductionOrder = existing
         ? {
@@ -95,6 +107,7 @@ export class DemoProductionOrderRepository implements ProductionOrderRepository 
             note: validated.data.note,
             status: "OPEN",
             receivedDocumentId: null,
+            receiptDocumentIds: [],
             createdAt: now,
             updatedAt: now,
             receivedAt: null,
@@ -130,9 +143,9 @@ export class DemoProductionOrderRepository implements ProductionOrderRepository 
     });
   }
 
-  async receive(orderId: string, effectiveDate: string): Promise<ProductionOrderReceiptResult> {
+  async receive(input: ProductionOrderReceiptInput): Promise<ProductionOrderReceiptResult> {
     return this.mutate(async (state) => {
-      const order = requiredOrder(state, orderId);
+      const order = requiredOrder(state, input.orderId);
       if (order.status === "CANCELLED") {
         throw new Error("ไม่สามารถรับใบผลิตที่ยกเลิกแล้ว");
       }
@@ -140,27 +153,49 @@ export class DemoProductionOrderRepository implements ProductionOrderRepository 
         return { state, result: receiptResult(state, order) };
       }
 
+      const requestKey = receiptRequestKey(input);
+      const previousDocumentId = state.receiptRequests[requestKey];
+      if (previousDocumentId) {
+        const previousDocument = state.receipts[previousDocumentId];
+        if (previousDocument) return { state, result: { order, document: previousDocument } };
+      }
+
+      const selectedLines = input.lines?.length
+        ? input.lines
+        : order.lines
+            .filter((line) => line.receivedQuantity < line.quantity)
+            .map((line) => ({ lineId: line.id, quantity: line.quantity - line.receivedQuantity }));
+      const linesById = new Map(order.lines.map((line) => [line.id, line]));
+      validateReceiptLines(selectedLines, linesById);
+
       const document = await this.inventory.postDocument({
         type: "RECEIPT",
-        effectiveDate,
+        effectiveDate: input.effectiveDate,
         reference: order.number,
         note: `รับเข้าจากใบผลิต ${order.number}`,
-        lines: order.lines.map((line) => ({
-          variantId: line.variantId,
-          size: line.size,
-          quantity: line.quantity,
-        })),
+        lines: selectedLines.map(({ lineId, quantity }) => {
+          const line = linesById.get(lineId)!;
+          return { variantId: line.variantId, size: line.size, quantity };
+        }),
       });
       const now = this.now();
+      const selectedByLineId = new Map(selectedLines.map(({ lineId, quantity }) => [lineId, quantity]));
+      const lines = order.lines.map((line) => ({
+        ...line,
+        receivedQuantity: line.receivedQuantity + (selectedByLineId.get(line.id) ?? 0),
+      }));
+      const complete = lines.every((line) => line.receivedQuantity === line.quantity);
       const received: ProductionOrder = {
         ...order,
-        status: "RECEIVED",
+        status: complete ? "RECEIVED" : "OPEN",
         receivedDocumentId: document.id,
-        receivedAt: now,
+        receiptDocumentIds: [...order.receiptDocumentIds, document.id],
+        receivedAt: complete ? now : null,
         updatedAt: now,
+        lines,
       };
       return {
-        state: storeReceipt(replaceOrder(state, received), document),
+        state: storeReceipt(replaceOrder(state, received), document, requestKey),
         result: { order: received, document },
       };
     });
@@ -212,7 +247,7 @@ export class DemoProductionOrderRepository implements ProductionOrderRepository 
 }
 
 function emptyState(): DemoState {
-  return { version: 1, revision: 0, orders: [], receipts: {} };
+  return { version: 1, revision: 0, orders: [], receipts: {}, receiptRequests: {} };
 }
 
 function nextNumber(state: DemoState, orderDate: string): string {
@@ -232,10 +267,11 @@ function replaceOrder(state: DemoState, order: ProductionOrder): DemoState {
   };
 }
 
-function storeReceipt(state: DemoState, document: StockDocument): DemoState {
+function storeReceipt(state: DemoState, document: StockDocument, requestKey: string): DemoState {
   return {
     ...state,
     receipts: { ...state.receipts, [document.id]: document },
+    receiptRequests: { ...state.receiptRequests, [requestKey]: document.id },
   };
 }
 
@@ -255,6 +291,7 @@ function snapshotLine(
   input: ProductionOrderLineInput,
   lineNumber: number,
   id: string,
+  receivedQuantity: number,
 ): ProductionOrderLine {
   const variant = snapshot.variants.find((candidate) =>
     candidate.id === input.variantId && candidate.active);
@@ -271,8 +308,34 @@ function snapshotLine(
     colorName: color.name,
     size: variant.size,
     quantity: input.quantity,
+    receivedQuantity,
     unitPrice: input.unitPrice,
   };
+}
+
+function receiptRequestKey(input: ProductionOrderReceiptInput): string {
+  const lines = input.lines
+    ? [...input.lines].sort((left, right) => left.lineId.localeCompare(right.lineId))
+    : null;
+  return JSON.stringify({ orderId: input.orderId, effectiveDate: input.effectiveDate, lines });
+}
+
+function validateReceiptLines(
+  lines: ProductionOrderReceiptLineInput[],
+  linesById: Map<string, ProductionOrderLine>,
+): void {
+  if (lines.length === 0 || new Set(lines.map((line) => line.lineId)).size !== lines.length) {
+    throw new Error("à¸à¸£à¸¸à¸“à¸²à¸£à¸°à¸šà¸¸à¸£à¸²à¸¢à¸à¸²à¸£à¸£à¸±à¸šà¹€à¸‚à¹‰à¸²");
+  }
+  for (const receiptLine of lines) {
+    const line = linesById.get(receiptLine.lineId);
+    if (!line
+      || !Number.isInteger(receiptLine.quantity)
+      || receiptLine.quantity < 1
+      || receiptLine.quantity > line.quantity - line.receivedQuantity) {
+      throw new Error("à¸ˆà¸³à¸™à¸§à¸™à¸£à¸±à¸šà¹€à¸‚à¹‰à¸²à¹„à¸¡à¹ˆà¸–à¸¹à¸à¸•à¹‰à¸­à¸‡");
+    }
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -289,6 +352,9 @@ function isProductionOrderLineRecord(value: unknown): value is ProductionOrderLi
     && typeof value.colorName === "string" && value.colorName.length > 0
     && typeof value.size === "string" && size === value.size
     && Number.isInteger(value.quantity) && (value.quantity as number) > 0
+    && Number.isInteger(value.receivedQuantity)
+    && (value.receivedQuantity as number) >= 0
+    && (value.receivedQuantity as number) <= (value.quantity as number)
     && (value.unitPrice === null
       || (typeof value.unitPrice === "number" && amountToMinor(value.unitPrice) !== null));
 }
@@ -302,6 +368,8 @@ function isProductionOrderRecord(value: unknown): value is ProductionOrder {
     || typeof value.note !== "string"
     || !["OPEN", "RECEIVED", "CANCELLED"].includes(String(value.status))
     || (value.receivedDocumentId !== null && typeof value.receivedDocumentId !== "string")
+    || !Array.isArray(value.receiptDocumentIds)
+    || !value.receiptDocumentIds.every((documentId) => typeof documentId === "string" && documentId.length > 0)
     || typeof value.createdAt !== "string"
     || typeof value.updatedAt !== "string"
     || (value.receivedAt !== null && typeof value.receivedAt !== "string")
@@ -312,7 +380,7 @@ function isProductionOrderRecord(value: unknown): value is ProductionOrder {
 
   const order = value as unknown as ProductionOrder;
   const terminalFieldsAreValid = order.status === "OPEN"
-    ? order.receivedDocumentId === null && order.receivedAt === null && order.cancelledAt === null
+    ? order.receivedAt === null && order.cancelledAt === null
     : order.status === "RECEIVED"
       ? !!order.receivedDocumentId && !!order.receivedAt && order.cancelledAt === null
       : order.receivedDocumentId === null && order.receivedAt === null && !!order.cancelledAt;
@@ -348,6 +416,8 @@ function isDemoState(value: unknown): value is DemoState {
     && state.orders.every(isProductionOrderRecord)
     && !!state.receipts
     && typeof state.receipts === "object"
+    && !!state.receiptRequests
+    && typeof state.receiptRequests === "object"
     && Object.values(state.receipts).every(isStockDocumentRecord);
 }
 
@@ -364,10 +434,22 @@ function projectDemoState(value: unknown): DemoState | null {
         if (!isRecord(line)) return line;
         const size = normalizeSizeLabel(line.size);
         const unitPrice = "unitPrice" in line ? line.unitPrice : null;
-        return size ? { ...line, size, unitPrice } : line;
+        if (!size) return line;
+        const status = typeof candidate.status === "string" ? candidate.status : "OPEN";
+        const receivedQuantity = Number.isInteger(line.receivedQuantity)
+          ? line.receivedQuantity
+          : status === "RECEIVED" ? line.quantity : 0;
+        return { ...line, size, unitPrice, receivedQuantity };
       }),
+      receiptDocumentIds: Array.isArray(candidate.receiptDocumentIds)
+        ? candidate.receiptDocumentIds
+        : candidate.receivedDocumentId ? [candidate.receivedDocumentId] : [],
     };
   });
-  const projected = { ...value, orders };
+  const projected = {
+    ...value,
+    orders,
+    receiptRequests: isRecord(value.receiptRequests) ? value.receiptRequests : {},
+  };
   return isDemoState(projected) ? projected : null;
 }
