@@ -7,7 +7,7 @@ import {
 } from "@/lib/supabase";
 import type { StockDocument, StockDocumentLine } from "@/features/inventory/domain/types";
 import { normalizeSizeLabel } from "@/features/inventory/domain/size-label";
-import { amountToMinor } from "../domain/money";
+import { amountToMinor, discountAmountToMinor } from "../domain/money";
 import type {
   ProductionOrder,
   ProductionOrderInput,
@@ -93,6 +93,9 @@ function mappedLine(value: unknown, status: ProductionOrderStatus): ProductionOr
 }
 
 function mappedOrder(value: unknown): ProductionOrder {
+  const discount = isRecord(value)
+    ? ("discount" in value ? value.discount : 0)
+    : undefined;
   if (!isRecord(value)
     || !isNonEmptyString(value.id)
     || !isNonEmptyString(value.number)
@@ -100,6 +103,8 @@ function mappedOrder(value: unknown): ProductionOrder {
     || !isIsoDate(value.expectedDate)
     || value.expectedDate < value.orderDate
     || typeof value.note !== "string"
+    || typeof discount !== "number"
+    || discountAmountToMinor(discount) === null
     || !isStatus(value.status)
     || (value.receivedDocumentId !== null && !isNonEmptyString(value.receivedDocumentId))
     || !isTimestamp(value.createdAt)
@@ -137,6 +142,7 @@ function mappedOrder(value: unknown): ProductionOrder {
     orderDate: value.orderDate,
     expectedDate: value.expectedDate,
     note: value.note,
+    discount,
     status: value.status,
     receivedDocumentId: value.receivedDocumentId,
     receiptDocumentIds,
@@ -227,6 +233,7 @@ function commandFor(input: ProductionOrderInput): Json {
     orderDate: input.orderDate,
     expectedDate: input.expectedDate,
     note: input.note,
+    discount: input.discount,
     lines: input.lines.map((line) => ({
       variantId: line.variantId,
       quantity: line.quantity,

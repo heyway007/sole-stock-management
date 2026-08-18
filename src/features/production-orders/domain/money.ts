@@ -1,4 +1,4 @@
-const MAX_UNIT_PRICE_MINOR = 999_999_999_999;
+const MAX_AMOUNT_MINOR = 999_999_999_999;
 
 const BAHT_FORMATTER = new Intl.NumberFormat("th-TH", {
   minimumFractionDigits: 2,
@@ -9,8 +9,21 @@ export function amountToMinor(value: number | null): number | null {
   if (value === null || !Number.isFinite(value) || value <= 0) return null;
   const scaled = value * 100;
   const rounded = Math.round(scaled);
-  const tolerance = Number.EPSILON * Math.max(1, Math.abs(scaled)) * 8;
-  if (Math.abs(scaled - rounded) > tolerance || rounded > MAX_UNIT_PRICE_MINOR) {
+  if (!Number.isSafeInteger(rounded)
+    || rounded / 100 !== value
+    || rounded > MAX_AMOUNT_MINOR) {
+    return null;
+  }
+  return rounded;
+}
+
+export function discountAmountToMinor(value: number): number | null {
+  if (!Number.isFinite(value) || value < 0) return null;
+  const scaled = value * 100;
+  const rounded = Math.round(scaled);
+  if (!Number.isSafeInteger(rounded)
+    || rounded / 100 !== value
+    || rounded > MAX_AMOUNT_MINOR) {
     return null;
   }
   return rounded;
@@ -21,6 +34,14 @@ export function parseUnitPriceInput(value: string): number | null {
   if (!/^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/.test(normalized)) return null;
   const amount = Number(normalized);
   return amountToMinor(amount) === null ? null : amount;
+}
+
+export function parseDiscountInput(value: string): number | null {
+  const normalized = value.trim();
+  if (normalized === "") return 0;
+  if (!/^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/.test(normalized)) return null;
+  const amount = Number(normalized);
+  return discountAmountToMinor(amount) === null ? null : amount;
 }
 
 export function lineTotalMinor(

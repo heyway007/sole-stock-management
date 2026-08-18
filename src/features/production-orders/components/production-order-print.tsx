@@ -11,6 +11,7 @@ import {
 } from "../domain/money";
 import { summarizeProductionOrder } from "../domain/selectors";
 import type { ProductionOrder } from "../domain/types";
+import { productionOrderDetailHref } from "../routes";
 
 const statusLabels = {
   OPEN: "รอรับเข้า",
@@ -28,7 +29,7 @@ export function ProductionOrderPrint({ order }: { order: ProductionOrder }) {
   return (
     <div className="production-print-preview">
       <div className="print-controls print-hidden">
-        <Link className="button button--secondary" href={`/production-orders/${order.id}`}>
+        <Link className="button button--secondary" href={productionOrderDetailHref(order.id)}>
           <ArrowLeft aria-hidden size={17} />กลับไปใบผลิต
         </Link>
         <Button onClick={() => window.print()}>

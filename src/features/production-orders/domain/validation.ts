@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { amountToMinor } from "./money";
+import { amountToMinor, discountAmountToMinor } from "./money";
 import type { ProductionOrderInput, ProductionOrderValidationError } from "./types";
 
 const schema = z.object({
@@ -7,6 +7,7 @@ const schema = z.object({
   orderDate: z.iso.date(),
   expectedDate: z.iso.date(),
   note: z.string(),
+  discount: z.number().refine((value) => discountAmountToMinor(value) !== null),
   lines: z.array(z.object({
     variantId: z.string().trim().min(1),
     quantity: z.number().finite().int().positive(),
@@ -38,6 +39,13 @@ function schemaError(path: string): ProductionOrderValidationError {
       path,
       code: "INVALID_UNIT_PRICE",
       message: "ราคาต่อหน่วยต้องมากกว่า 0 และมีทศนิยมไม่เกิน 2 ตำแหน่ง",
+    };
+  }
+  if (path === "discount") {
+    return {
+      path,
+      code: "INVALID_DISCOUNT",
+      message: "ส่วนลดต้องเป็น 0 หรือมากกว่า และมีทศนิยมไม่เกิน 2 ตำแหน่ง",
     };
   }
   return {

@@ -14,6 +14,7 @@ import {
   type ProductionOrderFilters,
 } from "@/features/production-orders/domain/selectors";
 import { useProductionOrders } from "@/features/production-orders/production-order-provider";
+import { productionOrderDetailHref } from "@/features/production-orders/routes";
 
 const initialFilters: ProductionOrderFilters = { query: "", status: "ALL" };
 
@@ -124,7 +125,7 @@ export function ProductionOrdersPageContent() {
                   const orderSummary = summarizeProductionOrder(order);
                   return (
                     <tr key={order.id}>
-                      <td><Link href={`/production-orders/${order.id}`}><strong>{order.number}</strong></Link></td>
+                      <td><Link href={productionOrderDetailHref(order.id)}><strong>{order.number}</strong></Link></td>
                       <td>{order.orderDate}</td>
                       <td>{order.expectedDate}</td>
                       <td>{orderSummary.lineCount} รายการ</td>
@@ -141,7 +142,7 @@ export function ProductionOrdersPageContent() {
             {filteredOrders.map((order) => {
               const orderSummary = summarizeProductionOrder(order);
               return (
-                <Link className="production-order-card" href={`/production-orders/${order.id}`} role="listitem" key={order.id}>
+                <Link className="production-order-card" href={productionOrderDetailHref(order.id)} role="listitem" key={order.id}>
                   <header>
                     <div><strong>{order.number}</strong><span>กำหนดรับ {order.expectedDate}</span></div>
                     <ProductionOrderStatus status={order.status} />

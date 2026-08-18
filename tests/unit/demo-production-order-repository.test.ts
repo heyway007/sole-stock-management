@@ -32,6 +32,7 @@ async function fixtureWithOpenOrder() {
     orderDate: "2026-07-22",
     expectedDate: "2026-08-05",
     note: "",
+    discount: 0,
     lines: snapshot.variants.slice(0, 2).map((variant, index) => ({
       variantId: variant.id,
       quantity: index + 4,
@@ -57,11 +58,13 @@ describe("DemoProductionOrderRepository", () => {
       orderDate: "2026-07-22",
       expectedDate: "2026-08-05",
       note: "รอบแรก",
+      discount: 150,
       lines: [{ variantId: first.id, quantity: 4, unitPrice: 327.5 }],
     });
     expect(created).toMatchObject({
       number: "PO-20260722-000001",
       status: "OPEN",
+      discount: 150,
     });
     expect(created.lines[0]).toMatchObject({
       modelName: "Paris",
@@ -76,12 +79,14 @@ describe("DemoProductionOrderRepository", () => {
       orderDate: created.orderDate,
       expectedDate: "2026-08-08",
       note: "แก้แล้ว",
+      discount: 200.5,
       lines: [{ variantId: second.id, quantity: 6, unitPrice: 265 }],
     });
     expect(edited).toMatchObject({
       id: created.id,
       number: created.number,
       expectedDate: "2026-08-08",
+      discount: 200.5,
     });
     await expect(repository.cancel(created.id)).resolves.toMatchObject({ status: "CANCELLED" });
     await expect(repository.save({
@@ -89,6 +94,7 @@ describe("DemoProductionOrderRepository", () => {
       orderDate: edited.orderDate,
       expectedDate: edited.expectedDate,
       note: edited.note,
+      discount: edited.discount,
       lines: edited.lines.map((line) => ({
         variantId: line.variantId,
         quantity: line.quantity,
@@ -217,6 +223,7 @@ describe("DemoProductionOrderRepository", () => {
       orderDate: "2026-07-22",
       expectedDate: "2026-07-22",
       note: "",
+      discount: 0,
       lines: [{ variantId: variant.id, quantity: 1, unitPrice: 100 }],
     });
     expect(JSON.parse(storage.getItem(PRODUCTION_ORDER_STORAGE_KEY) ?? "null")).toMatchObject({
@@ -232,10 +239,12 @@ describe("DemoProductionOrderRepository", () => {
     ) as {
       orders: Array<{
         id: string;
+        discount?: number;
         lines: Array<{ id: string; size: string | number; unitPrice?: number }>;
       }>;
     };
     const originalLineId = persisted.orders[0].lines[0].id;
+    delete persisted.orders[0].discount;
     persisted.orders[0].lines[0].size = 38;
     delete persisted.orders[0].lines[0].unitPrice;
     storage.setItem(PRODUCTION_ORDER_STORAGE_KEY, JSON.stringify(persisted));
@@ -246,6 +255,7 @@ describe("DemoProductionOrderRepository", () => {
     ).load();
 
     expect(loaded[0].id).toBe(order.id);
+    expect(loaded[0].discount).toBe(0);
     expect(loaded[0].lines[0]).toMatchObject({
       id: originalLineId,
       size: "38",

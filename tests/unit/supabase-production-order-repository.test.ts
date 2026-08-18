@@ -40,6 +40,7 @@ const openOrder = {
   orderDate: "2026-07-22",
   expectedDate: "2026-08-05",
   note: "รอบแรก",
+  discount: 150.5,
   status: "OPEN",
   receivedDocumentId: null,
   receiptDocumentIds: [],
@@ -106,6 +107,7 @@ describe("SupabaseProductionOrderRepository", () => {
       orderDate: "2026-07-22",
       expectedDate: "2026-08-05",
       note: "รอบแรก",
+      discount: 150.5,
       lines: [{ variantId: "variant-1", quantity: 4, unitPrice: 327.5 }],
     })).resolves.toMatchObject({ status: "OPEN" });
     await expect(repository.cancel("order-1")).resolves.toMatchObject({ status: "CANCELLED" });
@@ -122,6 +124,7 @@ describe("SupabaseProductionOrderRepository", () => {
           command: expect.objectContaining({
             requestId: "request-create",
             orderDate: "2026-07-22",
+            discount: 150.5,
             lines: [{ variantId: "variant-1", quantity: 4, unitPrice: 327.5 }],
           }),
         },
@@ -184,6 +187,7 @@ describe("SupabaseProductionOrderRepository", () => {
       orderDate: "2026-07-22",
       expectedDate: "2026-08-05",
       note: "รอบแรก",
+      discount: 150.5,
       lines: [{ variantId: "variant-1", quantity: 4, unitPrice: 327.5 }],
     };
 
@@ -291,5 +295,41 @@ describe("SupabaseProductionOrderRepository", () => {
     await expect(repository.load()).resolves.toMatchObject([
       { lines: [{ unitPrice: null }] },
     ]);
+  });
+
+  it("loads a legacy order without discount as zero and rejects malformed discounts", async () => {
+    const legacyClient = new ContractClient();
+    const legacyOrder = Object.fromEntries(
+      Object.entries(openOrder).filter(([key]) => key !== "discount"),
+    );
+    legacyClient.rpcResults.push({
+      data: [legacyOrder],
+      error: null,
+    });
+    const legacyRepository = new SupabaseProductionOrderRepository(
+      "https://example.supabase.co",
+      "anon",
+      asClient(legacyClient),
+    );
+
+    await expect(legacyRepository.load()).resolves.toMatchObject([
+      { discount: 0 },
+    ]);
+
+    for (const discount of [null, -1, 1.234]) {
+      const client = new ContractClient();
+      client.rpcResults.push({
+        data: [{ ...openOrder, discount }],
+        error: null,
+      });
+      const repository = new SupabaseProductionOrderRepository(
+        "https://example.supabase.co",
+        "anon",
+        asClient(client),
+      );
+      await expect(repository.load()).rejects.toThrow(
+        "ข้อมูลใบผลิตจากเซิร์ฟเวอร์ไม่ถูกต้อง",
+      );
+    }
   });
 });

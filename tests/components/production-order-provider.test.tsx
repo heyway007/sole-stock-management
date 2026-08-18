@@ -29,6 +29,7 @@ const openOrder: ProductionOrder = {
   orderDate: "2026-07-22",
   expectedDate: "2026-08-05",
   note: "",
+  discount: 0,
   status: "OPEN",
   receivedDocumentId: null,
   receiptDocumentIds: [],
@@ -107,6 +108,7 @@ function ProductionState() {
       orderDate: "2026-07-22",
       expectedDate: "2026-08-05",
       note: "",
+      discount: 0,
       lines: [{ variantId: "paris-black-38", quantity: 4, unitPrice: 327 }],
     })}>บันทึก</button>
     <button onClick={() => void production.receive({

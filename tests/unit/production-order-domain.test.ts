@@ -11,6 +11,7 @@ const validInput: ProductionOrderInput = {
   orderDate: "2026-07-22",
   expectedDate: "2026-08-05",
   note: "รอบต้นเดือน",
+  discount: 0,
   lines: [
     { variantId: "variant-1", quantity: 4, unitPrice: 327 },
     { variantId: "variant-2", quantity: 6, unitPrice: 265 },
@@ -23,6 +24,7 @@ const order: ProductionOrder = {
   orderDate: "2026-07-22",
   expectedDate: "2026-08-05",
   note: "รอบต้นเดือน",
+  discount: 0,
   status: "OPEN",
   receivedDocumentId: null,
   receiptDocumentIds: [],
@@ -64,9 +66,18 @@ describe("production-order domain", () => {
     });
   });
 
+  it("accepts a non-negative discount with at most two decimal places", () => {
+    expect(validateProductionOrder({ ...validInput, discount: 250.5 })).toEqual({
+      success: true,
+      data: { ...validInput, discount: 250.5 },
+    });
+  });
+
   it.each([
     ["expected date", { ...validInput, expectedDate: "2026-07-21" }, "expectedDate"],
     ["empty lines", { ...validInput, lines: [] }, "lines"],
+    ["negative discount", { ...validInput, discount: -1 }, "discount"],
+    ["discount precision", { ...validInput, discount: 1.234 }, "discount"],
     ["quantity", { ...validInput, lines: [{ variantId: "variant-1", quantity: 1.5, unitPrice: 100 }] }, "lines.0.quantity"],
     ["zero unit price", { ...validInput, lines: [{ variantId: "variant-1", quantity: 1, unitPrice: 0 }] }, "lines.0.unitPrice"],
     ["unit price precision", { ...validInput, lines: [{ variantId: "variant-1", quantity: 1, unitPrice: 327.555 }] }, "lines.0.unitPrice"],
@@ -80,6 +91,17 @@ describe("production-order domain", () => {
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.errors).toEqual(expect.arrayContaining([expect.objectContaining({ path })]));
+    }
+  });
+
+  it("reports the dedicated discount error code", () => {
+    const result = validateProductionOrder({ ...validInput, discount: -1 });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.errors).toContainEqual(expect.objectContaining({
+        path: "discount",
+        code: "INVALID_DISCOUNT",
+      }));
     }
   });
 

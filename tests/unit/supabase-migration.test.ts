@@ -23,6 +23,14 @@ const partialReceiptMigrationPath = resolve(
   process.cwd(),
   "supabase/migrations/202608180008_partial_production_order_receipts.sql",
 );
+const discountMigrationPath = resolve(
+  process.cwd(),
+  "supabase/migrations/202607290008_production_order_discount.sql",
+);
+const discountCompatibilityMigrationPath = resolve(
+  process.cwd(),
+  "supabase/migrations/202607290009_production_order_discount_compatibility.sql",
+);
 
 describe("Supabase inventory migration ACL", () => {
   it("revokes broad catalog writes before granting only the required columns", () => {
@@ -246,6 +254,51 @@ describe("Supabase retired half-size migration", () => {
     expect(updateIndex).toBeLessThan(validationIndex);
     expect(retirementMigration).not.toMatch(
       /delete\s+from\s+public\.(?:product_variants|inventory_balances|stock_documents|stock_document_lines|production_orders|production_order_lines)/,
+    );
+  });
+});
+
+describe("Supabase production-order discount migration", () => {
+  it("persists a non-negative discount through the JSON and save contracts", () => {
+    const discountMigration = readFileSync(discountMigrationPath, "utf8")
+      .replaceAll("\r\n", "\n")
+      .toLocaleLowerCase("en-US");
+
+    expect(discountMigration).toContain(
+      "add column discount numeric(14,2) not null default 0",
+    );
+    expect(discountMigration).toContain("check (discount >= 0)");
+    expect(discountMigration).toContain(
+      "'discount', production_order.discount",
+    );
+    expect(discountMigration).toContain(
+      "pg_catalog.jsonb_typeof(command -> 'discount') is distinct from 'number'",
+    );
+    expect(discountMigration).toContain(
+      "discount_value := (command ->> 'discount')::numeric",
+    );
+    expect(discountMigration).not.toMatch(
+      /delete\s+from\s+public\.production_orders/,
+    );
+  });
+
+  it("keeps the save RPC compatible with clients that omit discount", () => {
+    const compatibilityMigration = readFileSync(
+      discountCompatibilityMigrationPath,
+      "utf8",
+    ).replaceAll("\r\n", "\n").toLocaleLowerCase("en-US");
+
+    expect(compatibilityMigration).toMatch(
+      /command \? 'discount'\s+and pg_catalog\.jsonb_typeof\(command -> 'discount'\) is distinct from 'number'/,
+    );
+    expect(compatibilityMigration).toContain(
+      "discount_value := case when creating then 0 else locked_order.discount end",
+    );
+    expect(compatibilityMigration).toContain(
+      "create or replace function public.save_production_order(command jsonb)",
+    );
+    expect(compatibilityMigration).not.toContain(
+      "alter table public.production_orders",
     );
   });
 });
