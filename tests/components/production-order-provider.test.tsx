@@ -4,6 +4,7 @@ import { DemoInventoryRepository } from "@/features/inventory/data/demo-reposito
 import type { ProductionOrderRepository } from "@/features/production-orders/data/production-order-repository";
 import type {
   ProductionOrder,
+  ProductionOrderReceiptInput,
   ProductionOrderReceiptResult,
 } from "@/features/production-orders/domain/types";
 import {
@@ -50,6 +51,7 @@ const openOrder: ProductionOrder = {
 
 class FakeProductionOrderRepository implements ProductionOrderRepository {
   orders = [openOrder];
+  receivedInputs: ProductionOrderReceiptInput[] = [];
   async load() { return structuredClone(this.orders); }
   async save() { return structuredClone(this.orders[0]); }
   async cancel(orderId: string) {
@@ -61,9 +63,10 @@ class FakeProductionOrderRepository implements ProductionOrderRepository {
     this.orders = [cancelled];
     return structuredClone(cancelled);
   }
-  async receive(orderId: string): Promise<ProductionOrderReceiptResult> {
+  async receive(input: ProductionOrderReceiptInput): Promise<ProductionOrderReceiptResult> {
+    this.receivedInputs.push(input);
     const received: ProductionOrder = {
-      ...this.orders.find((order) => order.id === orderId)!,
+      ...this.orders.find((order) => order.id === input.orderId)!,
       status: "RECEIVED",
       receivedDocumentId: "document-1",
       receiptDocumentIds: ["document-1"],
@@ -106,7 +109,11 @@ function ProductionState() {
       note: "",
       lines: [{ variantId: "paris-black-38", quantity: 4, unitPrice: 327 }],
     })}>บันทึก</button>
-    <button onClick={() => void production.receive("order-1", "2026-07-22")}>รับเข้า</button>
+    <button onClick={() => void production.receive({
+      orderId: "order-1",
+      effectiveDate: "2026-07-22",
+      lines: [{ lineId: "line-1", quantity: 2 }],
+    })}>รับเข้า</button>
   </>;
 }
 
@@ -134,5 +141,10 @@ describe("ProductionOrderProvider", () => {
     fireEvent.click(screen.getByRole("button", { name: "รับเข้า" }));
     expect(await screen.findByText("สถานะ: RECEIVED")).toBeInTheDocument();
     expect(inventory.loadCount).toBeGreaterThan(baselineLoads);
+    expect(production.receivedInputs).toEqual([{
+      orderId: "order-1",
+      effectiveDate: "2026-07-22",
+      lines: [{ lineId: "line-1", quantity: 2 }],
+    }]);
   });
 });

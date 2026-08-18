@@ -69,6 +69,8 @@ describe("ProductionOrderDetailPage", () => {
     expect(screen.getByText("ส่งก่อนเที่ยง")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "พิมพ์ใบผลิต" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "รับเข้าสต๊อก" })).toBeInTheDocument();
+    expect(screen.getByText("รับแล้ว 0 / 4 คู่")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "รับเข้าแยก" })).toHaveLength(4);
   });
 
   it("shows incomplete pricing for a legacy order without inventing a zero", async () => {

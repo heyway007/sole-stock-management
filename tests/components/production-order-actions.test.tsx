@@ -14,12 +14,12 @@ vi.mock("sweetalert2", () => ({
 
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ProductionOrderActions } from "@/features/production-orders/components/production-order-actions";
-import type { ProductionOrder, ProductionOrderReceiptResult } from "@/features/production-orders/domain/types";
+import { ProductionOrderActions, ProductionOrderLineReceiptAction } from "@/features/production-orders/components/production-order-actions";
+import type { ProductionOrder, ProductionOrderLine, ProductionOrderReceiptResult } from "@/features/production-orders/domain/types";
 
 type ConfirmationOptions<T> = {
   text: string;
-  preConfirm(): Promise<T | false>;
+  preConfirm(value?: unknown): Promise<T | false>;
   allowOutsideClick(): boolean;
   allowEscapeKey(): boolean;
 };
@@ -106,7 +106,7 @@ describe("ProductionOrderActions", () => {
     expect(confirmation.text).toContain("รับ 10 คู่ จากใบผลิต PO-20260722-000001 เข้าสต๊อกทั้งหมด");
     expect(confirmation.allowOutsideClick()).toBe(false);
     expect(confirmation.allowEscapeKey()).toBe(false);
-    expect(onReceive).toHaveBeenCalledWith("order-1", expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/));
+    expect(onReceive).toHaveBeenCalledWith({ orderId: "order-1", effectiveDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) });
     expect(fireMock.mock.calls[1][0]).toMatchObject({
       icon: "success",
       title: "รับเข้าสต๊อกแล้ว",
@@ -122,5 +122,32 @@ describe("ProductionOrderActions", () => {
     const confirmation = fireMock.mock.calls[0][0] as ConfirmationOptions<ProductionOrderReceiptResult>;
     await act(async () => expect(confirmation.preConfirm()).resolves.toBe(false));
     expect(showValidationMessageMock).toHaveBeenCalledWith("เชื่อมต่อไม่ได้");
+  });
+
+  it("receives a bounded quantity for one production line", async () => {
+    const onReceive = vi.fn().mockResolvedValue(receiptResult);
+    fireMock
+      .mockImplementationOnce(async (options: ConfirmationOptions<ProductionOrderReceiptResult>) => ({
+        isConfirmed: true,
+        value: await options.preConfirm("2"),
+      }))
+      .mockResolvedValueOnce({ isConfirmed: true });
+    const line = openOrder.lines[0] as ProductionOrderLine;
+
+    render(<ProductionOrderLineReceiptAction order={openOrder} line={line} onReceive={onReceive} />);
+    fireEvent.click(screen.getByRole("button", { name: "รับเข้าแยก" }));
+
+    await waitFor(() => expect(fireMock).toHaveBeenCalledTimes(2));
+    const confirmation = fireMock.mock.calls[0][0] as ConfirmationOptions<ProductionOrderReceiptResult> & {
+      input?: string;
+      inputAttributes?: Record<string, string>;
+    };
+    expect(confirmation.input).toBe("number");
+    expect(confirmation.inputAttributes).toMatchObject({ min: "1", max: "4", step: "1" });
+    expect(onReceive).toHaveBeenCalledWith({
+      orderId: "order-1",
+      effectiveDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      lines: [{ lineId: "line-1", quantity: 2 }],
+    });
   });
 });

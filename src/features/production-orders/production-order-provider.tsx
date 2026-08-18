@@ -19,6 +19,7 @@ import type { ProductionOrderRepository } from "./data/production-order-reposito
 import type {
   ProductionOrder,
   ProductionOrderInput,
+  ProductionOrderReceiptInput,
   ProductionOrderReceiptResult,
 } from "./domain/types";
 
@@ -31,7 +32,7 @@ interface ProductionOrderContextValue {
   refresh(): Promise<void>;
   save(input: ProductionOrderInput): Promise<ProductionOrder>;
   cancel(orderId: string): Promise<ProductionOrder>;
-  receive(orderId: string, effectiveDate: string): Promise<ProductionOrderReceiptResult>;
+  receive(input: ProductionOrderReceiptInput): Promise<ProductionOrderReceiptResult>;
 }
 
 interface ProductionOrderProviderProps extends PropsWithChildren {
@@ -137,8 +138,8 @@ export function ProductionOrderProvider({
     (orderId: string) => runMutation((selected) => selected.cancel(orderId)),
     [runMutation],
   );
-  const receive = useCallback(async (orderId: string, effectiveDate: string) => {
-    const result = await runMutation((selected) => selected.receive(orderId, effectiveDate));
+  const receive = useCallback(async (input: ProductionOrderReceiptInput) => {
+    const result = await runMutation((selected) => selected.receive(input));
     await inventory.refresh();
     return result;
   }, [inventory, runMutation]);
