@@ -37,8 +37,8 @@ const orders: ProductionOrder[] = [
     receivedAt: null,
     cancelledAt: null,
     lines: [
-      { id: "line-1", variantId: "variant-1", lineNumber: 1, modelName: "Paris", colorName: "Black", size: "M", quantity: 4, receivedQuantity: 0, unitPrice: 327 },
-      { id: "line-2", variantId: "variant-2", lineNumber: 2, modelName: "Paris", colorName: "Black", size: "L", quantity: 6, receivedQuantity: 0, unitPrice: 265 },
+      { id: "line-1", variantId: "variant-1", lineNumber: 1, modelName: "Paris", colorName: "Black", size: "M", quantity: 20, receivedQuantity: 5, unitPrice: 327 },
+      { id: "line-2", variantId: "variant-2", lineNumber: 2, modelName: "Paris", colorName: "Black", size: "L", quantity: 20, receivedQuantity: 5, unitPrice: 265 },
     ],
   },
   {
@@ -94,7 +94,9 @@ describe("ProductionOrdersPage", () => {
     expect(within(table).getByText("PO-20260722-000001")).toBeInTheDocument();
 
     await user.type(screen.getByRole("searchbox", { name: "ค้นหาใบผลิต" }), "Paris Black");
-    expect(within(screen.getByRole("group", { name: "สรุปใบผลิต" })).getByText("10")).toBeInTheDocument();
+    expect(within(screen.getByRole("group", { name: "สรุปใบผลิต" })).getByText("40")).toBeInTheDocument();
+    expect(within(table).getByRole("columnheader", { name: "รับเข้าแล้ว" })).toBeInTheDocument();
+    expect(within(table).getByText("10 / 40 คู่")).toBeInTheDocument();
     expect(within(table).queryByText("PO-20260722-000002")).not.toBeInTheDocument();
 
     await user.selectOptions(screen.getByRole("combobox", { name: "สถานะใบผลิต" }), "CANCELLED");

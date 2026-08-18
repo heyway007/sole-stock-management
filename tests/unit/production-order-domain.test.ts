@@ -109,6 +109,7 @@ describe("production-order domain", () => {
     expect(summarizeProductionOrder(order)).toEqual({
       lineCount: 2,
       totalPairs: 10,
+      receivedPairs: 0,
       hasCompletePricing: true,
       totalAmountMinor: 289800,
     });

@@ -13,6 +13,7 @@ export function summarizeProductionOrder(order: ProductionOrder) {
   return {
     lineCount: order.lines.length,
     totalPairs: order.lines.reduce((total, line) => total + line.quantity, 0),
+    receivedPairs: order.lines.reduce((total, line) => total + line.receivedQuantity, 0),
     hasCompletePricing,
     totalAmountMinor: hasCompletePricing
       ? lineTotals.reduce<number>((total, value) => total + (value ?? 0), 0)

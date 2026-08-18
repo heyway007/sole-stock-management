@@ -117,6 +117,7 @@ export function ProductionOrdersPageContent() {
                   <th>กำหนดรับ</th>
                   <th>จำนวนรายการ</th>
                   <th>จำนวนคู่</th>
+                  <th>รับเข้าแล้ว</th>
                   <th>สถานะ</th>
                 </tr>
               </thead>
@@ -130,6 +131,7 @@ export function ProductionOrdersPageContent() {
                       <td>{order.expectedDate}</td>
                       <td>{orderSummary.lineCount} รายการ</td>
                       <td><strong>{orderSummary.totalPairs}</strong> คู่</td>
+                      <td>{orderSummary.receivedPairs} / {orderSummary.totalPairs} คู่</td>
                       <td><ProductionOrderStatus status={order.status} /></td>
                     </tr>
                   );
@@ -150,6 +152,7 @@ export function ProductionOrdersPageContent() {
                   <dl>
                     <div><dt>วันที่สั่งผลิต</dt><dd>{order.orderDate}</dd></div>
                     <div><dt>จำนวนรายการ</dt><dd>{orderSummary.lineCount} รายการ</dd></div>
+                    <div><dt>รับเข้าแล้ว</dt><dd>{orderSummary.receivedPairs} / {orderSummary.totalPairs} คู่</dd></div>
                     <div><dt>จำนวนทั้งหมด</dt><dd>{orderSummary.totalPairs} คู่</dd></div>
                   </dl>
                 </Link>
