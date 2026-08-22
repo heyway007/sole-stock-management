@@ -12,8 +12,9 @@ begin
     'public.receive_production_order(jsonb)'::pg_catalog.regprocedure
   ) into current_definition;
 
-  if pg_catalog.position(
-    'set received_document_id = case when all_received then' in current_definition
+  if pg_catalog.strpos(
+    current_definition,
+    'set received_document_id = case when all_received then'
   ) > 0 then
     null;
   else

@@ -35,6 +35,10 @@ const partialReceiptDiscountCompatibilityMigrationPath = resolve(
   process.cwd(),
   "supabase/migrations/202608180009_partial_receipt_discount_compatibility.sql",
 );
+const partialReceiptLegacyReferenceRepairMigrationPath = resolve(
+  process.cwd(),
+  "supabase/migrations/202608220010_fix_partial_receipt_legacy_reference.sql",
+);
 
 describe("Supabase inventory migration ACL", () => {
   it("revokes broad catalog writes before granting only the required columns", () => {
@@ -219,6 +223,16 @@ describe("Supabase partial production receipt migration", () => {
     expect(partialMigration).toContain(
       "received_document_id = case when all_received then (posted_document ->> 'id')::uuid else null end",
     );
+  });
+
+  it("uses valid PostgreSQL string-search syntax in the repair migration", () => {
+    const repairMigration = readFileSync(partialReceiptLegacyReferenceRepairMigrationPath, "utf8")
+      .replaceAll("\r\n", "\n")
+      .toLocaleLowerCase("en-US");
+
+    expect(repairMigration).toContain("pg_catalog.strpos(");
+    expect(repairMigration).toContain("current_definition,");
+    expect(repairMigration).not.toContain("pg_catalog.position(");
   });
 });
 
