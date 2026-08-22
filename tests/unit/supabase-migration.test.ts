@@ -210,6 +210,16 @@ describe("Supabase partial production receipt migration", () => {
     expect(partialMigration).toContain("not exists (");
     expect(partialMigration).toContain("status = 'received'");
   });
+
+  it("keeps the legacy receipt reference null until the order is fully received", () => {
+    const partialMigration = readFileSync(partialReceiptMigrationPath, "utf8")
+      .replaceAll("\r\n", "\n")
+      .toLocaleLowerCase("en-US");
+
+    expect(partialMigration).toContain(
+      "received_document_id = case when all_received then (posted_document ->> 'id')::uuid else null end",
+    );
+  });
 });
 
 describe("Supabase production-order pricing migration", () => {

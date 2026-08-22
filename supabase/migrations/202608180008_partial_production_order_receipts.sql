@@ -407,7 +407,7 @@ begin
       and production_line.received_quantity < production_line.quantity
   ) into all_received;
   update public.production_orders
-  set received_document_id = (posted_document ->> 'id')::uuid,
+  set received_document_id = case when all_received then (posted_document ->> 'id')::uuid else null end,
       status = case when all_received then 'RECEIVED' else 'OPEN' end,
       received_at = case when all_received then statement_timestamp() else null end,
       updated_at = statement_timestamp()
